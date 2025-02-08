@@ -48,12 +48,16 @@ export class MemStorage implements IStorage {
   private async generateOpenSCADContent(params: MortiseTemplate): Promise<string> {
     const textDepth = 0.75; // 3 layers at 0.25mm layer height
 
+    // Calculate offset
+    const offset = (params.bushing_OD_in - params.bit_diameter_in) / 2;
+
     // Convert measurements to fractions
     const bushingOD = this.decimalToFraction(params.bushing_OD_in);
     const bitDiameter = this.decimalToFraction(params.bit_diameter_in);
     const mortiseLength = this.decimalToFraction(params.mortise_length_in);
     const mortiseWidth = this.decimalToFraction(params.mortise_width_in);
     const edgeDistance = this.decimalToFraction(params.edge_distance_in);
+    const offsetFraction = this.decimalToFraction(offset);
 
     return `
 // User Inputs (In Inches)
@@ -109,7 +113,7 @@ line_spacing = 5;
 text_start_x = cutout_x_position;
 text_start_y = (edge_position == "left") 
     ? cutout_y_position + cutout_width + 10
-    : cutout_y_position - 25;
+    : cutout_y_position - 30; // Adjusted to accommodate extra line
 
 // Rounded Rectangle Module
 module rounded_rectangle(length, width, radius) {
@@ -134,6 +138,8 @@ module template_text() {
                 text(str("Width: ", "${mortiseWidth}", "\\""), size = text_size, halign = "left");
             translate([0, -4*line_spacing, 0])
                 text(str("Edge Dist: ", "${edgeDistance}", "\\""), size = text_size, halign = "left");
+            translate([0, -5*line_spacing, 0])
+                text(str("Offset: ", "${offsetFraction}", "\\""), size = text_size, halign = "left");
         }
     }
 }
