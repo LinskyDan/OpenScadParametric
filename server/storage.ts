@@ -32,21 +32,28 @@ export class MemStorage implements IStorage {
     }
 
     if (denominator === 1) {
-      return `${numerator}"`;
+      return `${numerator}`;
     }
 
     const wholePart = Math.floor(numerator / denominator);
     const remainingNumerator = numerator % denominator;
 
     if (wholePart === 0) {
-      return `${remainingNumerator}/${denominator}"`;
+      return `${remainingNumerator}/${denominator}`;
     }
 
-    return `${wholePart}-${remainingNumerator}/${denominator}"`;
+    return `${wholePart}-${remainingNumerator}/${denominator}`;
   }
 
   private async generateOpenSCADContent(params: MortiseTemplate): Promise<string> {
     const textDepth = 0.75; // 3 layers at 0.25mm layer height
+
+    // Convert measurements to fractions
+    const bushingOD = this.decimalToFraction(params.bushing_OD_in);
+    const bitDiameter = this.decimalToFraction(params.bit_diameter_in);
+    const mortiseLength = this.decimalToFraction(params.mortise_length_in);
+    const mortiseWidth = this.decimalToFraction(params.mortise_width_in);
+    const edgeDistance = this.decimalToFraction(params.edge_distance_in);
 
     return `
 // User Inputs (In Inches)
@@ -96,7 +103,7 @@ cutout_y_position = (edge_position == "left")
 edge_x_offset = (edge_position == "left") ? 0 : template_width - edge_thickness;
 cutout_x_position = (template_length - cutout_length) / 2;
 
-// Text content
+// Text parameters
 text_size = 3;
 line_spacing = 5;
 text_start_x = cutout_x_position;
@@ -118,15 +125,15 @@ module rounded_rectangle(length, width, radius) {
 module template_text() {
     translate([text_start_x, text_start_y, template_thickness - text_depth]) {
         linear_extrude(height = text_depth + 0.1) {
-            text(str("Bushing OD: ${this.decimalToFraction(params.bushing_OD_in)}"), size = text_size, halign = "left");
+            text(str("Bushing OD: ", "${bushingOD}", "\\""), size = text_size, halign = "left");
             translate([0, -line_spacing, 0])
-                text(str("Bit Dia: ${this.decimalToFraction(params.bit_diameter_in)}"), size = text_size, halign = "left");
+                text(str("Bit Dia: ", "${bitDiameter}", "\\""), size = text_size, halign = "left");
             translate([0, -2*line_spacing, 0])
-                text(str("Length: ${this.decimalToFraction(params.mortise_length_in)}"), size = text_size, halign = "left");
+                text(str("Length: ", "${mortiseLength}", "\\""), size = text_size, halign = "left");
             translate([0, -3*line_spacing, 0])
-                text(str("Width: ${this.decimalToFraction(params.mortise_width_in)}"), size = text_size, halign = "left");
+                text(str("Width: ", "${mortiseWidth}", "\\""), size = text_size, halign = "left");
             translate([0, -4*line_spacing, 0])
-                text(str("Edge Dist: ${this.decimalToFraction(params.edge_distance_in)}"), size = text_size, halign = "left");
+                text(str("Edge Dist: ", "${edgeDistance}", "\\""), size = text_size, halign = "left");
         }
     }
 }
