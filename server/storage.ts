@@ -7,7 +7,10 @@ import { promisify } from "util";
 const execAsync = promisify(exec);
 
 export interface IStorage {
-  generateSTLFile(params: MortiseTemplate): Promise<Buffer>;
+  generateSTLFile(params: MortiseTemplate): Promise<{
+    filePath: string;
+    content: Buffer;
+  }>;
 }
 
 export class MemStorage implements IStorage {
@@ -98,7 +101,7 @@ mortise_template();
 edge_stop();`;
   }
 
-  async generateSTLFile(params: MortiseTemplate): Promise<Buffer> {
+  async generateSTLFile(params: MortiseTemplate): Promise<{ filePath: string; content: Buffer }> {
     try {
       const tempDir = path.join(process.cwd(), 'temp');
       await fs.mkdir(tempDir, { recursive: true });
@@ -110,8 +113,12 @@ edge_stop();`;
       await execAsync(`openscad -o "${stlFile}" "${scadFile}"`);
       const stlContent = await fs.readFile(stlFile);
       await fs.unlink(scadFile);
-      await fs.unlink(stlFile);
-      return stlContent;
+
+      // Keep the STL file for preview
+      return {
+        filePath: stlFile,
+        content: stlContent
+      };
     } catch (error) {
       console.error('Error generating STL:', error);
       throw new Error('Failed to generate STL file');
