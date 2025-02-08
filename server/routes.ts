@@ -7,10 +7,17 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/generate", async (req, res) => {
     try {
       const params = mortiseTemplateSchema.parse(req.body);
-      const scadContent = await storage.generateOpenSCADFile(params);
-      res.json({ content: scadContent });
+      const stlContent = await storage.generateSTLFile(params);
+
+      res.set({
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': 'attachment; filename="mortise_template.stl"'
+      });
+
+      res.send(stlContent);
     } catch (error) {
-      res.status(400).json({ error: "Invalid parameters" });
+      console.error('Error:', error);
+      res.status(400).json({ error: "Failed to generate STL file" });
     }
   });
 

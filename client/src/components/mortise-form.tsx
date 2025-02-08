@@ -9,7 +9,6 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } fr
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 
 const defaultValues: MortiseTemplate = {
   bushing_OD_in: 0.3125,
@@ -31,29 +30,36 @@ export function MortiseForm() {
 
   const mutation = useMutation({
     mutationFn: async (data: MortiseTemplate) => {
-      const response = await apiRequest("POST", "/api/generate", data);
-      return response.json();
-    },
-    onSuccess: (data) => {
-      const blob = new Blob([data.content], { type: "text/plain" });
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate STL file");
+      }
+
+      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "mortise_template.scad";
+      a.download = "mortise_template.stl";
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
+    },
+    onSuccess: () => {
       toast({
         title: "Success!",
-        description: "OpenSCAD file has been generated and downloaded.",
+        description: "STL file has been generated and downloaded.",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to generate OpenSCAD file.",
+        description: "Failed to generate STL file.",
         variant: "destructive",
       });
     },
@@ -194,7 +200,7 @@ export function MortiseForm() {
           ) : (
             <>
               <Download className="mr-2 h-4 w-4" />
-              Generate OpenSCAD File
+              Generate STL File
             </>
           )}
         </Button>

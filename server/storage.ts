@@ -1,14 +1,18 @@
 import { type MortiseTemplate } from "@shared/schema";
 import fs from "fs/promises";
 import path from "path";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
 
 export interface IStorage {
-  generateOpenSCADFile(params: MortiseTemplate): Promise<string>;
+  generateSTLFile(params: MortiseTemplate): Promise<Buffer>;
 }
 
 export class MemStorage implements IStorage {
-  async generateOpenSCADFile(params: MortiseTemplate): Promise<string> {
-    const scadContent = `
+  private async generateOpenSCADContent(params: MortiseTemplate): Promise<string> {
+    return `
 // User Inputs (In Inches)
 bushing_OD_in = ${params.bushing_OD_in};       // Outside diameter of the guide bushing
 bit_diameter_in = ${params.bit_diameter_in};       // Outside diameter of the router bit
@@ -76,7 +80,7 @@ module mortise_template() {
     difference() {
         // Base Template
         cube([template_length, template_width, template_thickness]); 
-        
+
         // Mortise Cutout with Properly Rounded Corners
         translate([cutout_x_position, cutout_y_position, 0])
             rounded_rectangle(cutout_length, cutout_width, corner_radius);
@@ -92,8 +96,26 @@ module edge_stop() {
 // Render the Template and Edge Stop
 mortise_template();
 edge_stop();`;
+  }
 
-    return scadContent;
+  async generateSTLFile(params: MortiseTemplate): Promise<Buffer> {
+    try {
+      const tempDir = path.join(process.cwd(), 'temp');
+      await fs.mkdir(tempDir, { recursive: true });
+      const timestamp = Date.now();
+      const scadFile = path.join(tempDir, `mortise_${timestamp}.scad`);
+      const stlFile = path.join(tempDir, `mortise_${timestamp}.stl`);
+      const scadContent = await this.generateOpenSCADContent(params);
+      await fs.writeFile(scadFile, scadContent);
+      await execAsync(`openscad -o "${stlFile}" "${scadFile}"`);
+      const stlContent = await fs.readFile(stlFile);
+      await fs.unlink(scadFile);
+      await fs.unlink(stlFile);
+      return stlContent;
+    } catch (error) {
+      console.error('Error generating STL:', error);
+      throw new Error('Failed to generate STL file');
+    }
   }
 }
 
