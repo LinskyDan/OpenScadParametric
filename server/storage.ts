@@ -47,15 +47,23 @@ export class MemStorage implements IStorage {
 
   private async generateOpenSCADContent(params: MortiseTemplate): Promise<string> {
     const textDepth = 0.75; // 3 layers at 0.25mm layer height
+    const scale_factor = 25.4; // 1 inch = 25.4 mm
 
-    // Calculate offset in inches and convert measurements to fractions
-    const offset = (params.bushing_OD_in - params.bit_diameter_in) / 2;
+    // Convert inputs to millimeters first
+    const bushing_OD = params.bushing_OD_in * scale_factor;
+    const bit_diameter = params.bit_diameter_in * scale_factor;
+
+    // Calculate offset in millimeters then convert to inches
+    const offset_mm = (bushing_OD - bit_diameter) / 2;
+    const offset_inches = offset_mm / scale_factor;
+
+    // Convert measurements to fractions
     const bushingOD = this.decimalToFraction(params.bushing_OD_in);
     const bitDiameter = this.decimalToFraction(params.bit_diameter_in);
     const mortiseLength = this.decimalToFraction(params.mortise_length_in);
     const mortiseWidth = this.decimalToFraction(params.mortise_width_in);
     const edgeDistance = this.decimalToFraction(params.edge_distance_in);
-    const offsetFraction = this.decimalToFraction(offset);
+    const offsetFraction = this.decimalToFraction(offset_inches);
 
     return `
 // User Inputs (In Inches)
