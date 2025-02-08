@@ -136,7 +136,7 @@ module template_text() {
             translate([0, -4*line_spacing, 0])
                 text(str("Edge Dist: ", "${edgeDistance}", "\\""), size = text_size, halign = "left");
             translate([0, -5*line_spacing, 0])
-                text(str("Offset: ", str(offset_inch), "\\""), size = text_size, halign = "left");
+                text(str("Offset: ", offset_inch * 1000 / 1000, "\\""), size = text_size, halign = "left");
         }
     }
 }
