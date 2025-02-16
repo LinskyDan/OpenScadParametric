@@ -78,7 +78,7 @@ export class DatabaseStorage implements IStorage {
 
     const unitSuffix = params.unit_system === "metric" ? "mm" : "\"";
 
-    return `
+    return String.raw`
 // User Inputs (In Inches)
 bushing_OD_in = ${params.bushing_OD_in};       // Outside diameter of the guide bushing
 bit_diameter_in = ${params.bit_diameter_in};       // Outside diameter of the router bit
@@ -201,6 +201,7 @@ difference() {
       const tempDir = path.join(process.cwd(), 'temp');
       await fs.mkdir(tempDir, { recursive: true });
       const timestamp = Date.now();
+      console.log('Generating SCAD file with params:', JSON.stringify(params, null, 2));
       const scadFile = path.join(tempDir, `mortise_${timestamp}.scad`);
       const stlFile = path.join(tempDir, `mortise_${timestamp}.stl`);
       const scadContent = await this.generateOpenSCADContent(params);
