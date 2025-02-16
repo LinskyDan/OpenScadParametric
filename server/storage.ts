@@ -51,7 +51,7 @@ export class DatabaseStorage implements IStorage {
 
   private formatMeasurement(value: number, unitSystem: string): string {
     if (unitSystem === "metric") {
-      return `${value.toFixed(1)}`;
+      return value.toFixed(1);
     }
     return this.decimalToFraction(value);
   }
@@ -84,6 +84,11 @@ export class DatabaseStorage implements IStorage {
     const cutout_x = (total_length - cutout_length) / 2;
     const cutout_y = edge_thickness + edge_distance + offset;
 
+    // Format measurements for display
+    const unitSuffix = params.unit_system === "metric" ? "mm" : "\"";
+    const formatValue = (value: number) => 
+      this.formatMeasurement(value, params.unit_system) + unitSuffix;
+
     return `
 // Basic dimensions
 total_length = ${total_length};
@@ -96,6 +101,7 @@ cutout_width = ${cutout_width};
 cutout_x = ${cutout_x};
 cutout_y = ${cutout_y};
 corner_radius = ${bushing_OD / 2};
+text_depth = 0.8;
 
 // Rounded rectangle module
 module rounded_rect(length, width, height, radius) {
@@ -108,6 +114,30 @@ module rounded_rect(length, width, height, radius) {
             cylinder(h=height, r=radius, $fn=50);
         translate([length - radius, width - radius, 0])
             cylinder(h=height, r=radius, $fn=50);
+    }
+}
+
+// Text module
+module template_text() {
+    text_size = 3;
+    line_spacing = 4;
+    text_x = cutout_x;
+    text_y = cutout_y + cutout_width + 5;
+
+    translate([text_x, text_y, thickness - text_depth]) {
+        linear_extrude(height = text_depth + 0.1) {
+            text("Bushing OD: ${formatValue(params.bushing_OD_in)}", size = text_size);
+            translate([0, -line_spacing * 1, 0])
+                text("Bit Dia: ${formatValue(params.bit_diameter_in)}", size = text_size);
+            translate([0, -line_spacing * 2, 0])
+                text("Length: ${formatValue(params.mortise_length_in)}", size = text_size);
+            translate([0, -line_spacing * 3, 0])
+                text("Width: ${formatValue(params.mortise_width_in)}", size = text_size);
+            translate([0, -line_spacing * 4, 0])
+                text("Edge Dist: ${formatValue(params.edge_distance_in)}", size = text_size);
+            translate([0, -line_spacing * 5, 0])
+                text("Offset: ${formatValue(offset/scale)}", size = text_size);
+        }
     }
 }
 
@@ -125,6 +155,9 @@ difference() {
     translate([cutout_x, cutout_y, -0.1])
         rounded_rect(cutout_length, cutout_width, thickness + 0.2, corner_radius);
 }
+
+// Add text
+template_text();
 `;
   }
 
@@ -176,6 +209,7 @@ difference() {
   async getTemplates(): Promise<MortiseTemplate[]> {
     const templates = await db.select().from(mortiseTemplates).orderBy(mortiseTemplates.created_at);
     return templates.map(template => ({
+      unit_system: template.unit_system,
       bushing_OD_in: Number(template.bushing_OD_in),
       bit_diameter_in: Number(template.bit_diameter_in),
       mortise_length_in: Number(template.mortise_length_in),
@@ -184,7 +218,6 @@ difference() {
       edge_position: template.edge_position,
       extension_length_in: Number(template.extension_length_in),
       extension_width_in: Number(template.extension_width_in),
-      unit_system: template.unit_system,
       template_thickness_in: Number(template.template_thickness_in)
     }));
   }
