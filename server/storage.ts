@@ -30,6 +30,11 @@ export class DatabaseStorage implements IStorage {
     const wholePart = Math.floor(decimal);
     const fractionalPart = decimal - wholePart;
 
+    // Special handling for 1/16 (0.03125)
+    if (Math.abs(fractionalPart - 0.03125) < 0.001) {
+      return "1/16";
+    }
+
     // Check for zero fractional part
     if (Math.abs(fractionalPart) < 0.001) {
       return wholePart.toString();
@@ -52,6 +57,7 @@ export class DatabaseStorage implements IStorage {
         num = num / divisor;
         den = den / divisor;
 
+        // Return appropriate format based on whole part
         if (wholePart === 0) {
           return `${num}/${den}`;
         }
@@ -59,7 +65,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // If no match found, return decimal format
+    // If no match found, return decimal format with 3 decimal places
     return decimal.toFixed(3);
   }
 
@@ -67,7 +73,7 @@ export class DatabaseStorage implements IStorage {
     if (unitSystem === "metric") {
       return value.toFixed(1);
     }
-    return this.decimalToFraction(value);
+    return this.decimalToFraction(value) + '"';
   }
 
   private async generateOpenSCADContent(params: MortiseTemplate): Promise<string> {
@@ -106,7 +112,7 @@ export class DatabaseStorage implements IStorage {
       mortise_length: this.formatMeasurement(params.mortise_length_in, params.unit_system),
       mortise_width: this.formatMeasurement(params.mortise_width_in, params.unit_system),
       edge_distance: this.formatMeasurement(params.edge_distance_in, params.unit_system),
-      offset: params.unit_system === "imperial" ? this.decimalToFraction(offset_in) : offset_in.toFixed(2)
+      offset: params.unit_system === "imperial" ? this.decimalToFraction(offset_in) + '"' : offset_in.toFixed(2)
     };
 
     return `
