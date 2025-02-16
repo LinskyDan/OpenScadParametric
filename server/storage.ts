@@ -57,111 +57,73 @@ export class DatabaseStorage implements IStorage {
   }
 
   private async generateOpenSCADContent(params: MortiseTemplate): Promise<string> {
-    const textDepth = 0.75;
-    const scale_factor = 25.4;
+    // Convert all measurements to millimeters for OpenSCAD
+    const scale = 25.4; // inches to mm
 
-    const bushing_OD = params.bushing_OD_in * scale_factor;
-    const bit_diameter = params.bit_diameter_in * scale_factor;
-    const template_thickness = params.template_thickness_in * scale_factor;
+    const bushing_OD = params.bushing_OD_in * scale;
+    const bit_diameter = params.bit_diameter_in * scale;
+    const mortise_length = params.mortise_length_in * scale;
+    const mortise_width = params.mortise_width_in * scale;
+    const edge_distance = params.edge_distance_in * scale;
+    const extension_length = params.extension_length_in * scale;
+    const extension_width = params.extension_width_in * scale;
+    const template_thickness = params.template_thickness_in * scale;
+    const edge_height = 12.7; // 0.5 inches in mm
+    const edge_thickness = 9.525; // 0.375 inches in mm
 
-    const offset_mm = (bushing_OD - bit_diameter) / 2;
-    const offset_inches = offset_mm / scale_factor;
+    // Calculate offset
+    const offset = (bushing_OD - bit_diameter) / 2;
+    const cutout_length = mortise_length + (offset * 2);
+    const cutout_width = mortise_width + (offset * 2);
 
-    const formatValue = (value: number) => {
-      return params.unit_system === "metric" 
-        ? (value * scale_factor).toFixed(1)
-        : this.formatMeasurement(value, "imperial");
-    };
+    // Base template dimensions
+    const total_length = cutout_length + (extension_length * 2);
+    const total_width = cutout_width + edge_thickness + extension_width;
 
-    const unitSuffix = params.unit_system === "metric" ? "mm" : "\"";
+    // Position calculations
+    const cutout_x = (total_length - cutout_length) / 2;
+    const cutout_y = edge_thickness + edge_distance + offset;
 
     return `
-// Constants and Conversion
-scale_factor = 25.4;  // mm per inch
-text_depth = 0.75;    // depth of embossed text
+// Basic dimensions
+total_length = ${total_length};
+total_width = ${total_width};
+thickness = ${template_thickness};
+edge_height = ${edge_height};
+edge_thickness = ${edge_thickness};
+cutout_length = ${cutout_length};
+cutout_width = ${cutout_width};
+cutout_x = ${cutout_x};
+cutout_y = ${cutout_y};
+corner_radius = ${bushing_OD / 2};
 
-// Template Parameters
-template_thickness = ${template_thickness};  // converted to mm
-bushing_OD = ${bushing_OD};                 // converted to mm
-bit_diameter = ${bit_diameter};             // converted to mm
-
-// User Parameters (in mm)
-mortise_length = ${params.mortise_length_in} * scale_factor;
-mortise_width = ${params.mortise_width_in} * scale_factor;
-edge_distance = ${params.edge_distance_in} * scale_factor;
-extension_length = ${params.extension_length_in} * scale_factor;
-extension_width = ${params.extension_width_in} * scale_factor;
-
-// Edge Stop Parameters
-edge_height = 12.7;        // 0.5" in mm
-edge_thickness = 9.525;    // 0.375" in mm
-
-// Calculated Parameters
-offset = (bushing_OD - bit_diameter) / 2;
-cutout_length = mortise_length + (offset * 2);
-cutout_width = mortise_width + (offset * 2);
-corner_radius = bushing_OD / 2;
-
-// Template Size Calculations
-template_length = cutout_length + (extension_length * 2);
-template_width = cutout_width + edge_thickness + extension_width;
-
-// Position Calculations
-cutout_x = (template_length - cutout_length) / 2;
-cutout_y = (edge_thickness + edge_distance + offset);
-
-// Modules
-module rounded_rectangle(length, width, radius) {
+// Rounded rectangle module
+module rounded_rect(length, width, height, radius) {
     hull() {
-        for (x = [radius, length - radius]) {
-            for (y = [radius, width - radius]) {
-                translate([x, y, 0])
-                    cylinder(h = template_thickness * 2, r = radius, center = false, $fn = 50);
-            }
-        }
+        translate([radius, radius, 0])
+            cylinder(h=height, r=radius, $fn=50);
+        translate([length - radius, radius, 0])
+            cylinder(h=height, r=radius, $fn=50);
+        translate([radius, width - radius, 0])
+            cylinder(h=height, r=radius, $fn=50);
+        translate([length - radius, width - radius, 0])
+            cylinder(h=height, r=radius, $fn=50);
     }
 }
 
-module template_text() {
-    text_size = 3;
-    line_spacing = 4;
-    text_x = cutout_x;
-    text_y = cutout_y + cutout_width + 5;
-
-    translate([text_x, text_y, template_thickness - text_depth]) {
-        linear_extrude(height = text_depth + 0.1) {
-            text(str("Bushing OD: ", "${formatValue(params.bushing_OD_in)}", "${unitSuffix}"), size = text_size);
-            translate([0, -line_spacing * 1, 0])
-                text(str("Bit Dia: ", "${formatValue(params.bit_diameter_in)}", "${unitSuffix}"), size = text_size);
-            translate([0, -line_spacing * 2, 0])
-                text(str("Length: ", "${formatValue(params.mortise_length_in)}", "${unitSuffix}"), size = text_size);
-            translate([0, -line_spacing * 3, 0])
-                text(str("Width: ", "${formatValue(params.mortise_width_in)}", "${unitSuffix}"), size = text_size);
-            translate([0, -line_spacing * 4, 0])
-                text(str("Edge Dist: ", "${formatValue(params.edge_distance_in)}", "${unitSuffix}"), size = text_size);
-            translate([0, -line_spacing * 5, 0])
-                text(str("Offset: ", "${this.formatMeasurement(offset_inches, params.unit_system)}", "${unitSuffix}"), size = text_size);
-        }
-    }
-}
-
-// Main Template
+// Main template
 difference() {
     union() {
         // Base plate
-        cube([template_length, template_width, template_thickness]);
+        cube([total_length, total_width, thickness]);
 
         // Edge stop
-        translate([0, 0, template_thickness])
-            cube([template_length, edge_thickness, edge_height]);
+        cube([total_length, edge_thickness, thickness + edge_height]);
     }
 
     // Mortise cutout
     translate([cutout_x, cutout_y, -0.1])
-        rounded_rectangle(cutout_length, cutout_width, corner_radius);
-
-    // Add text
-    template_text();
+        rounded_rect(cutout_length, cutout_width, thickness + 0.2, corner_radius);
 }
 `;
   }
@@ -170,15 +132,21 @@ difference() {
     try {
       const tempDir = path.join(process.cwd(), 'temp');
       await fs.mkdir(tempDir, { recursive: true });
+
       const timestamp = Date.now();
-      console.log('Generating SCAD file with params:', JSON.stringify(params, null, 2));
       const scadFile = path.join(tempDir, `mortise_${timestamp}.scad`);
       const stlFile = path.join(tempDir, `mortise_${timestamp}.stl`);
+
+      console.log('Generating SCAD file with params:', JSON.stringify(params, null, 2));
       const scadContent = await this.generateOpenSCADContent(params);
       await fs.writeFile(scadFile, scadContent);
-      await execAsync(`openscad -o "${stlFile}" "${scadFile}"`);
+
+      const { stdout, stderr } = await execAsync(`openscad -o "${stlFile}" "${scadFile}"`);
+      console.log('OpenSCAD output:', stdout);
+      if (stderr) console.error('OpenSCAD stderr:', stderr);
+
       const stlContent = await fs.readFile(stlFile);
-      await fs.unlink(scadFile);
+      await fs.unlink(scadFile); // Clean up SCAD file
 
       return {
         filePath: stlFile,
