@@ -112,19 +112,32 @@ export function MortiseForm() {
               control={form.control}
               name="unit_system"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="space-y-3">
                   <FormLabel>Measurement System</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select measurement system" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="imperial">Imperial (inches)</SelectItem>
-                      <SelectItem value="metric">Metric (mm)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex flex-col space-y-1"
+                    >
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="imperial" />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          Imperial (inches)
+                        </FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="metric" />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          Metric (mm)
+                        </FormLabel>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
                   <FormDescription>Choose your preferred measurement system</FormDescription>
                 </FormItem>
               )}
