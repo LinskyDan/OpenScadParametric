@@ -297,6 +297,25 @@ export function MortiseForm() {
                 style={{ width: '100%', height: '100%' }}
                 orbitControls
                 shadows
+                modelProps={{ 
+                  scale: 1,
+                  rotationX: 0,
+                  rotationY: 0,
+                  rotationZ: 0
+                }}
+                rendererOptions={{
+                  antialias: true,
+                  alpha: true,
+                  preserveDrawingBuffer: true
+                }}
+                onError={(e) => {
+                  console.error('STL Viewer error:', e);
+                  toast({
+                    title: "Error",
+                    description: "Failed to load preview. Please try again.",
+                    variant: "destructive",
+                  });
+                }}
               />
             </div>
           )}
