@@ -136,10 +136,10 @@ union() {
     }
 
     // Add measurements text
-    translate([cutout_x, cutout_y + cutout_width + 8, thickness - 0.5]) {
-        mirror([1, 0, 0]) // Mirror horizontally to correct backwards text
-        rotate([0, 0, 180]) // Rotate to make text right-side up
-        translate([-cutout_length, 0, 0]) { // Adjust position after rotation
+    translate([cutout_x + cutout_length, cutout_y + cutout_width + 8, thickness - 0.5]) {
+        rotate([0, 0, 0]) // No rotation needed for correct orientation
+        mirror([0, 0, 0]) // No mirror needed for correct orientation
+        translate([-cutout_length, 0, 0]) { // Adjust position
             linear_extrude(height = 0.6) {
                 text(text="Bushing OD: ${formatValue(params.bushing_OD_in)}", 
                     size = 3, halign = "left", spacing = 1.1);
