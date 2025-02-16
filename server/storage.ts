@@ -65,6 +65,13 @@ export class MemStorage implements IStorage {
     const edgeDistance = this.decimalToFraction(params.edge_distance_in);
     const offsetFraction = this.decimalToFraction(offset_inches);
 
+    // Calculate actual edge distance after offset
+    const actual_edge_distance = params.edge_distance_in - offset_inches;
+    console.log(`Edge Distance Calculations:
+      User specified edge distance: ${params.edge_distance_in} inches
+      Offset: ${offset_inches} inches
+      Actual distance from edge to cutout: ${actual_edge_distance} inches`);
+
     return `
 // User Inputs (In Inches)
 bushing_OD_in = ${params.bushing_OD_in};       // Outside diameter of the guide bushing
