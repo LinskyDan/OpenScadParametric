@@ -96,8 +96,12 @@ extension_length = extension_length_in * scale_factor;
 extension_width = extension_width_in * scale_factor;
 text_depth = ${textDepth};
 
-// Offset Calculation
+// Offset Calculation - Moved earlier
 offset = (bushing_OD - bit_diameter) / 2;
+offset_inches = offset / scale_factor;
+
+// Adjusted edge distance calculation
+adjusted_edge_distance = (edge_distance_in + offset_inches) * scale_factor;
 
 // Template Dimensions
 cutout_length = mortise_length + (offset * 2);
@@ -106,10 +110,10 @@ corner_radius = bushing_OD / 2;
 template_length = cutout_length + (extension_length * 2);
 template_width = cutout_width + (2 * scale_factor) + extension_width;
 
-// Edge and Cutout Positioning
+// Edge and Cutout Positioning - Using adjusted edge distance
 cutout_y_position = (edge_position == "left") 
-    ? edge_distance_in * scale_factor + edge_thickness
-    : template_width - edge_distance_in * scale_factor - cutout_width - edge_thickness;
+    ? adjusted_edge_distance + edge_thickness
+    : template_width - adjusted_edge_distance - cutout_width - edge_thickness;
 edge_x_offset = (edge_position == "left") ? 0 : template_width - edge_thickness;
 cutout_x_position = (template_length - cutout_length) / 2;
 
@@ -175,7 +179,8 @@ difference() {
         edge_stop();
     }
     template_text();
-}`;
+}
+`;
   }
 
   async generateSTLFile(params: MortiseTemplate): Promise<{ filePath: string; content: Buffer }> {
