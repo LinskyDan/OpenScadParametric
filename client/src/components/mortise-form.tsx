@@ -306,7 +306,9 @@ export function MortiseForm() {
                 rendererOptions={{
                   antialias: true,
                   alpha: true,
-                  preserveDrawingBuffer: true
+                  preserveDrawingBuffer: true,
+                  powerPreference: "low-power",
+                  failIfMajorPerformanceCaveat: false
                 }}
                 onError={(e) => {
                   console.error('STL Viewer error:', e);
@@ -316,6 +318,7 @@ export function MortiseForm() {
                     variant: "destructive",
                   });
                 }}
+                className="bg-white"
               />
             </div>
           )}
