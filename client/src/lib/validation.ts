@@ -22,6 +22,7 @@ export const formSchema = mortiseTemplateSchema.extend({
     .min(0.1, "Must be at least 0.1mm in metric or 0.004\" in imperial")
     .max(125, "Must be less than 125mm in metric or 5\" in imperial")
     .describe("Distance from edge"),
+  edge_position: z.enum(["left", "right"]).describe("Edge fence position"),
   extension_length_in: z.number()
     .min(0.1, "Must be at least 0.1mm in metric or 0.004\" in imperial")
     .max(250, "Must be less than 250mm in metric or 10\" in imperial")

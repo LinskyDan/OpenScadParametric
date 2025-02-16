@@ -20,6 +20,7 @@ const defaultValues: MortiseTemplate = {
   mortise_length_in: 1.75,
   mortise_width_in: 0.375,
   edge_distance_in: 0.25,
+  edge_position: "right",
   extension_length_in: 3.0,
   extension_width_in: 3.0,
 };
@@ -98,12 +99,7 @@ export function MortiseForm() {
   };
 
   const onSubmit = (data: MortiseTemplate) => {
-    // Add edge_position to the form data
-    const formDataWithEdgePosition = {
-      ...data,
-      edge_position: "right" as const
-    };
-    mutation.mutate(formDataWithEdgePosition);
+    mutation.mutate(data);
   };
 
   return (
@@ -229,6 +225,28 @@ export function MortiseForm() {
                     />
                   </FormControl>
                   <FormDescription>Distance from the edge ({getUnitLabel()})</FormDescription>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="edge_position"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Edge Position</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select edge position" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="left">Left</SelectItem>
+                      <SelectItem value="right">Right</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Position of the edge fence</FormDescription>
                 </FormItem>
               )}
             />
