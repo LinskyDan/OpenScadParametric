@@ -143,10 +143,10 @@ text_start_y = (edge_position == "left")
 // Rounded Rectangle Module
 module rounded_rectangle(length, width, radius) {
     hull() {
-        translate([radius, radius, 0]) cylinder(h=10, r=radius, $fn=50);
-        translate([length - radius, radius, 0]) cylinder(h=10, r=radius, $fn=50);
-        translate([radius, width - radius, 0]) cylinder(h=10, r=radius, $fn=50);
-        translate([length - radius, width - radius, 0]) cylinder(h=10, r=radius, $fn=50);
+        translate([radius, radius, 0]) cylinder(h=template_thickness * 2, r=radius, $fn=50);
+        translate([length - radius, radius, 0]) cylinder(h=template_thickness * 2, r=radius, $fn=50);
+        translate([radius, width - radius, 0]) cylinder(h=template_thickness * 2, r=radius, $fn=50);
+        translate([length - radius, width - radius, 0]) cylinder(h=template_thickness * 2, r=radius, $fn=50);
     }
 }
 
