@@ -291,35 +291,43 @@ export function MortiseForm() {
             <DialogTitle>Preview Mortise Template</DialogTitle>
           </DialogHeader>
           {previewUrl && (
-            <div className="aspect-square w-full bg-black/5 rounded-lg overflow-hidden">
-              <StlViewer
-                url={previewUrl}
-                style={{ width: '100%', height: '100%' }}
-                orbitControls
-                shadows
-                modelProps={{ 
-                  scale: 1,
-                  rotationX: 0,
-                  rotationY: 0,
-                  rotationZ: 0
-                }}
-                rendererOptions={{
-                  antialias: true,
-                  alpha: true,
-                  preserveDrawingBuffer: true,
-                  powerPreference: "low-power",
-                  failIfMajorPerformanceCaveat: false
-                }}
-                onError={(e) => {
-                  console.error('STL Viewer error:', e);
-                  toast({
-                    title: "Error",
-                    description: "Failed to load preview. Please try again.",
-                    variant: "destructive",
-                  });
-                }}
-                className="bg-white"
-              />
+            <div className="aspect-square w-full bg-black/5 rounded-lg overflow-hidden relative">
+              {mutation.isPending ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+                </div>
+              ) : (
+                <StlViewer
+                  key={previewUrl}
+                  url={previewUrl}
+                  style={{ width: '100%', height: '100%' }}
+                  orbitControls
+                  shadows
+                  modelProps={{ 
+                    scale: 1,
+                    rotationX: 0,
+                    rotationY: 0,
+                    rotationZ: 0
+                  }}
+                  rendererOptions={{
+                    antialias: true,
+                    alpha: true,
+                    preserveDrawingBuffer: true,
+                    powerPreference: "default",
+                    failIfMajorPerformanceCaveat: false
+                  }}
+                  onError={(e) => {
+                    console.error('STL Viewer error:', e);
+                    toast({
+                      title: "Error",
+                      description: "Failed to load preview. Please try again.",
+                      variant: "destructive",
+                    });
+                    setShowPreview(false);
+                  }}
+                  className="bg-white"
+                />
+              )}
             </div>
           )}
           <Button onClick={downloadFile} className="mt-4">
