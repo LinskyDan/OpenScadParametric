@@ -67,9 +67,10 @@ export class DatabaseStorage implements IStorage {
     const offset_inches = offset_mm / scale_factor;
 
     const displayValue = (value: number) => {
-      return params.unit_system === "metric" 
+      const val = params.unit_system === "metric" 
         ? (value * scale_factor).toFixed(1)
         : this.decimalToFraction(value);
+      return val.replace(/-/g, '_');
     };
 
     const displayOffset = params.unit_system === "metric" 
