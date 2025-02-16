@@ -98,7 +98,12 @@ export function MortiseForm() {
   };
 
   const onSubmit = (data: MortiseTemplate) => {
-    mutation.mutate(data);
+    // Add edge_position to the form data
+    const formDataWithEdgePosition = {
+      ...data,
+      edge_position: "right" as const
+    };
+    mutation.mutate(formDataWithEdgePosition);
   };
 
   return (
