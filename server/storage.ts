@@ -154,15 +154,15 @@ module rounded_rectangle(length, width, radius) {
 module template_text() {
     translate([text_start_x, text_start_y, template_thickness - text_depth]) {
         linear_extrude(height = text_depth + 0.1) {
-            text(str("Bushing OD: ", str(displayValue(params.bushing_OD_in), unitSuffix)), size = text_size, halign = "left");
+            text(str("Bushing OD: ", str(displayValue(bushing_OD_in), unitSuffix)), size = text_size, halign = "left");
             translate([0, -line_spacing, 0])
-                text(str("Bit Dia: ", str(displayValue(params.bit_diameter_in), unitSuffix)), size = text_size, halign = "left");
+                text(str("Bit Dia: ", str(displayValue(bit_diameter_in), unitSuffix)), size = text_size, halign = "left");
             translate([0, -2*line_spacing, 0])
-                text(str("Length: ", str(displayValue(params.mortise_length_in), unitSuffix)), size = text_size, halign = "left");
+                text(str("Length: ", str(displayValue(mortise_length_in), unitSuffix)), size = text_size, halign = "left");
             translate([0, -3*line_spacing, 0])
-                text(str("Width: ", str(displayValue(params.mortise_width_in), unitSuffix)), size = text_size, halign = "left");
+                text(str("Width: ", str(displayValue(mortise_width_in), unitSuffix)), size = text_size, halign = "left");
             translate([0, -4*line_spacing, 0])
-                text(str("Edge Dist: ", str(displayValue(params.edge_distance_in), unitSuffix)), size = text_size, halign = "left");
+                text(str("Edge Dist: ", str(displayValue(edge_distance_in), unitSuffix)), size = text_size, halign = "left");
             translate([0, -5*line_spacing, 0])
                 text(str("Offset: ", str(displayOffset, unitSuffix)), size = text_size, halign = "left");
         }
