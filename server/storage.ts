@@ -51,9 +51,9 @@ export class DatabaseStorage implements IStorage {
 
   private formatMeasurement(value: number, unitSystem: string): string {
     if (unitSystem === "metric") {
-      return `${value.toFixed(1)}mm`;
+      return `${value.toFixed(1)}`;
     }
-    return `${this.decimalToFraction(value)}"`;
+    return this.decimalToFraction(value);
   }
 
   private async generateOpenSCADContent(params: MortiseTemplate): Promise<string> {
@@ -67,16 +67,11 @@ export class DatabaseStorage implements IStorage {
     const offset_mm = (bushing_OD - bit_diameter) / 2;
     const offset_inches = offset_mm / scale_factor;
 
-    const displayValue = (value: number) => {
-      const val = params.unit_system === "metric" 
+    const formatValue = (value: number) => {
+      return params.unit_system === "metric" 
         ? (value * scale_factor).toFixed(1)
-        : this.decimalToFraction(value);
-      return val.replace(/-/g, '_');
+        : this.formatMeasurement(value, "imperial");
     };
-
-    const displayOffset = params.unit_system === "metric" 
-      ? offset_mm.toFixed(1)
-      : this.decimalToFraction(offset_inches);
 
     const unitSuffix = params.unit_system === "metric" ? "mm" : "\"";
 
@@ -154,17 +149,17 @@ module rounded_rectangle(length, width, radius) {
 module template_text() {
     translate([text_start_x, text_start_y, template_thickness - text_depth]) {
         linear_extrude(height = text_depth + 0.1) {
-            text(str("Bushing OD: ", str(displayValue(bushing_OD_in), unitSuffix)), size = text_size, halign = "left");
+            text(str("Bushing OD: ", "${formatValue(params.bushing_OD_in)}${unitSuffix}"), size = text_size, halign = "left");
             translate([0, -line_spacing, 0])
-                text(str("Bit Dia: ", str(displayValue(bit_diameter_in), unitSuffix)), size = text_size, halign = "left");
+                text(str("Bit Dia: ", "${formatValue(params.bit_diameter_in)}${unitSuffix}"), size = text_size, halign = "left");
             translate([0, -2*line_spacing, 0])
-                text(str("Length: ", str(displayValue(mortise_length_in), unitSuffix)), size = text_size, halign = "left");
+                text(str("Length: ", "${formatValue(params.mortise_length_in)}${unitSuffix}"), size = text_size, halign = "left");
             translate([0, -3*line_spacing, 0])
-                text(str("Width: ", str(displayValue(mortise_width_in), unitSuffix)), size = text_size, halign = "left");
+                text(str("Width: ", "${formatValue(params.mortise_width_in)}${unitSuffix}"), size = text_size, halign = "left");
             translate([0, -4*line_spacing, 0])
-                text(str("Edge Dist: ", str(displayValue(edge_distance_in), unitSuffix)), size = text_size, halign = "left");
+                text(str("Edge Dist: ", "${formatValue(params.edge_distance_in)}${unitSuffix}"), size = text_size, halign = "left");
             translate([0, -5*line_spacing, 0])
-                text(str("Offset: ", str(displayOffset, unitSuffix)), size = text_size, halign = "left");
+                text(str("Offset: ", "${this.formatMeasurement(offset_inches, params.unit_system)}${unitSuffix}"), size = text_size, halign = "left");
         }
     }
 }
@@ -224,16 +219,16 @@ difference() {
 
   async saveTemplate(template: MortiseTemplate): Promise<void> {
     await db.insert(mortiseTemplates).values({
-      bushing_OD_in: template.bushing_OD_in,
-      bit_diameter_in: template.bit_diameter_in,
-      mortise_length_in: template.mortise_length_in,
-      mortise_width_in: template.mortise_width_in,
-      edge_distance_in: template.edge_distance_in,
-      edge_position: template.edge_position,
-      extension_length_in: template.extension_length_in,
-      extension_width_in: template.extension_width_in,
       unit_system: template.unit_system,
-      template_thickness_in: template.template_thickness_in
+      bushing_OD_in: template.bushing_OD_in.toString(),
+      bit_diameter_in: template.bit_diameter_in.toString(),
+      mortise_length_in: template.mortise_length_in.toString(),
+      mortise_width_in: template.mortise_width_in.toString(),
+      edge_distance_in: template.edge_distance_in.toString(),
+      edge_position: template.edge_position,
+      extension_length_in: template.extension_length_in.toString(),
+      extension_width_in: template.extension_width_in.toString(),
+      template_thickness_in: template.template_thickness_in.toString()
     });
   }
 
