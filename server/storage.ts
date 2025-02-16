@@ -85,9 +85,9 @@ export class DatabaseStorage implements IStorage {
     const edge_height = 12.7; // 0.5 inches in mm
     const edge_thickness = 9.525; // 0.375 inches in mm
 
-    // Calculate offset
-    const offset = (bushing_OD - bit_diameter) / 2;
-    const offset_in = offset / scale; // Convert back to inches for display
+    // Calculate offset in inches directly
+    const offset_in = (params.bushing_OD_in - params.bit_diameter_in) / 2;
+    const offset = offset_in * scale; // Convert to mm for OpenSCAD
     const cutout_length = mortise_length + (offset * 2);
     const cutout_width = mortise_width + (offset * 2);
 
