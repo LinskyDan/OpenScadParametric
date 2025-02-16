@@ -106,10 +106,11 @@ corner_radius = bushing_OD / 2;
 template_length = cutout_length + (extension_length * 2);
 template_width = cutout_width + (2 * scale_factor) + extension_width;
 
-// Edge and Cutout Positioning
+// Edge and Cutout Positioning - Adjusted for offset
 cutout_y_position = (edge_position == "left") 
-    ? edge_distance_in * scale_factor + edge_thickness
-    : template_width - edge_distance_in * scale_factor - cutout_width - edge_thickness;
+    ? (edge_distance_in * scale_factor + edge_thickness) - offset  // Subtract offset for left edge
+    : template_width - (edge_distance_in * scale_factor + edge_thickness + mortise_width); // Adjusted for right edge
+
 edge_x_offset = (edge_position == "left") ? 0 : template_width - edge_thickness;
 cutout_x_position = (template_length - cutout_length) / 2;
 
