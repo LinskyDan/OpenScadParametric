@@ -21,10 +21,10 @@ export class DatabaseStorage implements IStorage {
   private decimalToFraction(decimal: number): string {
     // Handle common fractions for woodworking (1/2, 1/4, 1/8, 1/16)
     const commonFractions = [
-      { denominator: 2, tolerance: 0.0625 },
-      { denominator: 4, tolerance: 0.03125 },
-      { denominator: 8, tolerance: 0.015625 },
-      { denominator: 16, tolerance: 0.0078125 }
+      { denominator: 2, tolerance: 0.0078125 },   // 1/2 (0.5)
+      { denominator: 4, tolerance: 0.00390625 },  // 1/4 (0.25)
+      { denominator: 8, tolerance: 0.001953125 }, // 1/8 (0.125)
+      { denominator: 16, tolerance: 0.0009765625 }// 1/16 (0.0625)
     ];
 
     const wholePart = Math.floor(decimal);
@@ -38,11 +38,24 @@ export class DatabaseStorage implements IStorage {
     // Try to match with common fractions
     for (const { denominator, tolerance } of commonFractions) {
       const nearestNumerator = Math.round(fractionalPart * denominator);
-      if (Math.abs(fractionalPart - nearestNumerator / denominator) < tolerance) {
+      const difference = Math.abs(fractionalPart - nearestNumerator / denominator);
+
+      if (difference < tolerance) {
+        // Simplify the fraction if possible
+        let num = nearestNumerator;
+        let den = denominator;
+
+        // Find the GCD
+        const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+        const divisor = gcd(num, den);
+
+        num = num / divisor;
+        den = den / divisor;
+
         if (wholePart === 0) {
-          return `${nearestNumerator}/${denominator}`;
+          return `${num}/${den}`;
         }
-        return `${wholePart}-${nearestNumerator}/${denominator}`;
+        return `${wholePart}-${num}/${den}`;
       }
     }
 
