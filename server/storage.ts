@@ -19,41 +19,35 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   private decimalToFraction(decimal: number): string {
-    const tolerance = 1.0E-6;
-    let h = [0, 1, 0];
-    let k = [1, 0, 0];
-    let a = Math.floor(decimal);
-    let x = decimal - a;
-    let n = 0;
+    // Handle common fractions for woodworking (1/2, 1/4, 1/8, 1/16)
+    const commonFractions = [
+      { denominator: 2, tolerance: 0.0625 },
+      { denominator: 4, tolerance: 0.03125 },
+      { denominator: 8, tolerance: 0.015625 },
+      { denominator: 16, tolerance: 0.0078125 }
+    ];
 
-    while (x !== 0 && n < 10) {
-      n++;
-      x = 1 / x;
-      a = Math.floor(x);
-
-      const hn = a * h[1] + h[0];
-      const kn = a * k[1] + k[0];
-
-      h = [h[1], hn, h[0]];
-      k = [k[1], kn, k[0]];
-
-      x = x - a;
-    }
-
-    const numerator = h[1];
-    const denominator = k[1];
     const wholePart = Math.floor(decimal);
+    const fractionalPart = decimal - wholePart;
 
-    if (denominator === 1) {
-      return `${numerator}`;
+    // Check for zero fractional part
+    if (Math.abs(fractionalPart) < 0.001) {
+      return wholePart.toString();
     }
 
-    if (wholePart === 0) {
-      return `${numerator}/${denominator}`;
+    // Try to match with common fractions
+    for (const { denominator, tolerance } of commonFractions) {
+      const nearestNumerator = Math.round(fractionalPart * denominator);
+      if (Math.abs(fractionalPart - nearestNumerator/denominator) < tolerance) {
+        if (wholePart === 0) {
+          return `${nearestNumerator}/${denominator}`;
+        }
+        return `${wholePart}-${nearestNumerator}/${denominator}`;
+      }
     }
 
-    const fractionalNumerator = numerator - (wholePart * denominator);
-    return `${wholePart}-${fractionalNumerator}/${denominator}`;
+    // If no match found, return decimal format
+    return decimal.toFixed(3);
   }
 
   private formatMeasurement(value: number, unitSystem: string): string {
@@ -142,30 +136,25 @@ union() {
     }
 
     // Add measurements text
-    translate([cutout_x, cutout_y + cutout_width + 8, thickness - 1]) {
-        linear_extrude(height = 1.1) {
+    translate([cutout_x, cutout_y + cutout_width + 8, thickness - 0.5]) {
+        linear_extrude(height = 0.6) {
             text(text="Bushing OD: ${formatValue(params.bushing_OD_in)}", 
-                size = 4, halign = "left", valign = "baseline");
-
-            translate([0, -6, 0])
+                size = 3, halign = "left", spacing = 1.1);
+            translate([0, -4, 0])
                 text(text="Bit Dia: ${formatValue(params.bit_diameter_in)}", 
-                    size = 4, halign = "left", valign = "baseline");
-
-            translate([0, -12, 0])
+                    size = 3, halign = "left", spacing = 1.1);
+            translate([0, -8, 0])
                 text(text="Length: ${formatValue(params.mortise_length_in)}", 
-                    size = 4, halign = "left", valign = "baseline");
-
-            translate([0, -18, 0])
+                    size = 3, halign = "left", spacing = 1.1);
+            translate([0, -12, 0])
                 text(text="Width: ${formatValue(params.mortise_width_in)}", 
-                    size = 4, halign = "left", valign = "baseline");
-
-            translate([0, -24, 0])
+                    size = 3, halign = "left", spacing = 1.1);
+            translate([0, -16, 0])
                 text(text="Edge Dist: ${formatValue(params.edge_distance_in)}", 
-                    size = 4, halign = "left", valign = "baseline");
-
-            translate([0, -30, 0])
+                    size = 3, halign = "left", spacing = 1.1);
+            translate([0, -20, 0])
                 text(text="Offset: ${formatValue(offset/scale)}", 
-                    size = 4, halign = "left", valign = "baseline");
+                    size = 3, halign = "left", spacing = 1.1);
         }
     }
 }
