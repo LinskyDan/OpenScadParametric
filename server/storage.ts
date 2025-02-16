@@ -1,8 +1,10 @@
-import { type MortiseTemplate } from "@shared/schema";
+import { type MortiseTemplate, type InsertMortiseTemplate, mortiseTemplates } from "@shared/schema";
 import fs from "fs/promises";
 import path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 const execAsync = promisify(exec);
 
@@ -11,15 +13,17 @@ export interface IStorage {
     filePath: string;
     content: Buffer;
   }>;
+  saveTemplate(template: MortiseTemplate): Promise<void>;
+  getTemplates(): Promise<MortiseTemplate[]>;
 }
 
-export class MemStorage implements IStorage {
+export class DatabaseStorage implements IStorage {
   private decimalToFraction(decimal: number): string {
     const tolerance = 1.0E-6;
     let numerator = 1;
     let denominator = 1;
     let bestError = Math.abs(decimal - numerator / denominator);
-    let maxDenominator = 16; // Limit to 16ths for practical woodworking
+    let maxDenominator = 16; 
 
     for (let d = 1; d <= maxDenominator; d++) {
       const n = Math.round(decimal * d);
@@ -46,18 +50,15 @@ export class MemStorage implements IStorage {
   }
 
   private async generateOpenSCADContent(params: MortiseTemplate): Promise<string> {
-    const textDepth = 0.75; // 3 layers at 0.25mm layer height
-    const scale_factor = 25.4; // 1 inch = 25.4 mm
+    const textDepth = 0.75;
+    const scale_factor = 25.4;
 
-    // Convert inputs to millimeters first
     const bushing_OD = params.bushing_OD_in * scale_factor;
     const bit_diameter = params.bit_diameter_in * scale_factor;
 
-    // Calculate offset in millimeters then convert to inches
     const offset_mm = (bushing_OD - bit_diameter) / 2;
     const offset_inches = offset_mm / scale_factor;
 
-    // Convert measurements to fractions
     const bushingOD = this.decimalToFraction(params.bushing_OD_in);
     const bitDiameter = this.decimalToFraction(params.bit_diameter_in);
     const mortiseLength = this.decimalToFraction(params.mortise_length_in);
@@ -123,7 +124,7 @@ line_spacing = 5;
 text_start_x = cutout_x_position;
 text_start_y = (edge_position == "left") 
     ? cutout_y_position + cutout_width + 10
-    : cutout_y_position - 30; // Adjusted to accommodate extra line
+    : cutout_y_position - 30; 
 
 // Rounded Rectangle Module
 module rounded_rectangle(length, width, radius) {
@@ -196,7 +197,6 @@ difference() {
       const stlContent = await fs.readFile(stlFile);
       await fs.unlink(scadFile);
 
-      // Keep the STL file for preview
       return {
         filePath: stlFile,
         content: stlContent
@@ -206,6 +206,33 @@ difference() {
       throw new Error('Failed to generate STL file');
     }
   }
+
+  async saveTemplate(template: MortiseTemplate): Promise<void> {
+    await db.insert(mortiseTemplates).values({
+      bushing_OD_in: template.bushing_OD_in,
+      bit_diameter_in: template.bit_diameter_in,
+      mortise_length_in: template.mortise_length_in,
+      mortise_width_in: template.mortise_width_in,
+      edge_distance_in: template.edge_distance_in,
+      edge_position: template.edge_position,
+      extension_length_in: template.extension_length_in,
+      extension_width_in: template.extension_width_in,
+    });
+  }
+
+  async getTemplates(): Promise<MortiseTemplate[]> {
+    const templates = await db.select().from(mortiseTemplates).orderBy(mortiseTemplates.created_at);
+    return templates.map(template => ({
+      bushing_OD_in: Number(template.bushing_OD_in),
+      bit_diameter_in: Number(template.bit_diameter_in),
+      mortise_length_in: Number(template.mortise_length_in),
+      mortise_width_in: Number(template.mortise_width_in),
+      edge_distance_in: Number(template.edge_distance_in),
+      edge_position: template.edge_position,
+      extension_length_in: Number(template.extension_length_in),
+      extension_width_in: Number(template.extension_width_in),
+    }));
+  }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
