@@ -31,5 +31,9 @@ export const formSchema = mortiseTemplateSchema.extend({
     .min(0.1, "Must be at least 0.1mm in metric or 0.004\" in imperial")
     .max(250, "Must be less than 250mm in metric or 10\" in imperial")
     .describe("Extra width beyond cutout"),
+  template_thickness_in: z.number()
+    .min(0.1, "Must be at least 0.1mm in metric or 0.004\" in imperial")
+    .max(2, "Must be less than 50mm in metric or 2\" in imperial")
+    .describe("Thickness of the template"),
   unit_system: z.enum(["imperial", "metric"]).describe("Measurement system")
 });

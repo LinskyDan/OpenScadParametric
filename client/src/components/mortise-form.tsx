@@ -20,9 +20,10 @@ const defaultValues: MortiseTemplate = {
   mortise_length_in: 1.75,
   mortise_width_in: 0.375,
   edge_distance_in: 0.25,
-  edge_position: "right", // Keep this in defaultValues
+  edge_position: "right",
   extension_length_in: 3.0,
   extension_width_in: 3.0,
+  template_thickness_in: 0.25, // Default template thickness (1/4 inch)
 };
 
 const mmToInch = (mm: number) => mm / 25.4;
@@ -265,6 +266,25 @@ export function MortiseForm() {
                     />
                   </FormControl>
                   <FormDescription>Extra width beyond the cutout ({getUnitLabel()})</FormDescription>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="template_thickness_in"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Template Thickness</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step={getStepSize()}
+                      {...field}
+                      value={formatValue(field.value)}
+                      onChange={e => field.onChange(parseValue(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormDescription>Thickness of the template ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />

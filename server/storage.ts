@@ -62,6 +62,7 @@ export class DatabaseStorage implements IStorage {
 
     const bushing_OD = params.bushing_OD_in * scale_factor;
     const bit_diameter = params.bit_diameter_in * scale_factor;
+    const template_thickness = params.template_thickness_in * scale_factor;
 
     const offset_mm = (bushing_OD - bit_diameter) / 2;
     const offset_inches = offset_mm / scale_factor;
@@ -89,9 +90,9 @@ edge_distance_in = ${params.edge_distance_in};      // Distance from the inside 
 edge_position = "${params.edge_position}";      // Options: "left" or "right"
 extension_length_in = ${params.extension_length_in};    // Extra length beyond the cutout (inches)
 extension_width_in = ${params.extension_width_in};     // Extra width beyond the cutout, opposite the fence (inches)
+template_thickness_in = ${params.template_thickness_in};   // Thickness of the template (inches)
 
 // Constants
-template_thickness_in = 0.25;   // Thickness of the template (inches)
 edge_height_in = 0.5;           // Height of the edge stop (inches)
 edge_thickness_in = 0.375;      // Thickness of the edge stop (inches)
 
@@ -231,7 +232,8 @@ difference() {
       edge_position: template.edge_position,
       extension_length_in: template.extension_length_in,
       extension_width_in: template.extension_width_in,
-      unit_system: template.unit_system
+      unit_system: template.unit_system,
+      template_thickness_in: template.template_thickness_in
     });
   }
 
@@ -246,7 +248,8 @@ difference() {
       edge_position: template.edge_position,
       extension_length_in: Number(template.extension_length_in),
       extension_width_in: Number(template.extension_width_in),
-      unit_system: template.unit_system
+      unit_system: template.unit_system,
+      template_thickness_in: Number(template.template_thickness_in)
     }));
   }
 }
