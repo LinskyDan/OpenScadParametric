@@ -38,7 +38,7 @@ export class DatabaseStorage implements IStorage {
     // Try to match with common fractions
     for (const { denominator, tolerance } of commonFractions) {
       const nearestNumerator = Math.round(fractionalPart * denominator);
-      if (Math.abs(fractionalPart - nearestNumerator/denominator) < tolerance) {
+      if (Math.abs(fractionalPart - nearestNumerator / denominator) < tolerance) {
         if (wholePart === 0) {
           return `${nearestNumerator}/${denominator}`;
         }
@@ -137,24 +137,28 @@ union() {
 
     // Add measurements text
     translate([cutout_x, cutout_y + cutout_width + 8, thickness - 0.5]) {
-        linear_extrude(height = 0.6) {
-            text(text="Bushing OD: ${formatValue(params.bushing_OD_in)}", 
-                size = 3, halign = "left", spacing = 1.1);
-            translate([0, -4, 0])
-                text(text="Bit Dia: ${formatValue(params.bit_diameter_in)}", 
+        mirror([1, 0, 0]) // Mirror horizontally to correct backwards text
+        rotate([0, 0, 180]) // Rotate to make text right-side up
+        translate([-cutout_length, 0, 0]) { // Adjust position after rotation
+            linear_extrude(height = 0.6) {
+                text(text="Bushing OD: ${formatValue(params.bushing_OD_in)}", 
                     size = 3, halign = "left", spacing = 1.1);
-            translate([0, -8, 0])
-                text(text="Length: ${formatValue(params.mortise_length_in)}", 
-                    size = 3, halign = "left", spacing = 1.1);
-            translate([0, -12, 0])
-                text(text="Width: ${formatValue(params.mortise_width_in)}", 
-                    size = 3, halign = "left", spacing = 1.1);
-            translate([0, -16, 0])
-                text(text="Edge Dist: ${formatValue(params.edge_distance_in)}", 
-                    size = 3, halign = "left", spacing = 1.1);
-            translate([0, -20, 0])
-                text(text="Offset: ${formatValue(offset/scale)}", 
-                    size = 3, halign = "left", spacing = 1.1);
+                translate([0, -4, 0])
+                    text(text="Bit Dia: ${formatValue(params.bit_diameter_in)}", 
+                        size = 3, halign = "left", spacing = 1.1);
+                translate([0, -8, 0])
+                    text(text="Length: ${formatValue(params.mortise_length_in)}", 
+                        size = 3, halign = "left", spacing = 1.1);
+                translate([0, -12, 0])
+                    text(text="Width: ${formatValue(params.mortise_width_in)}", 
+                        size = 3, halign = "left", spacing = 1.1);
+                translate([0, -16, 0])
+                    text(text="Edge Dist: ${formatValue(params.edge_distance_in)}", 
+                        size = 3, halign = "left", spacing = 1.1);
+                translate([0, -20, 0])
+                    text(text="Offset: ${formatValue(offset/scale)}", 
+                        size = 3, halign = "left", spacing = 1.1);
+            }
         }
     }
 }
