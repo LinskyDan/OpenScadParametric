@@ -10,6 +10,7 @@ export const mortiseTemplateSchema = z.object({
   mortise_length_in: z.number().min(0.1).max(250),
   mortise_width_in: z.number().min(0.1).max(250),
   edge_distance_in: z.number().min(0.1).max(125),
+  edge_position: z.enum(["left", "right"]),
   extension_length_in: z.number().min(0.1).max(250),
   extension_width_in: z.number().min(0.1).max(250),
 });
@@ -23,6 +24,7 @@ export const mortiseTemplates = pgTable('mortise_templates', {
   mortise_length_in: decimal('mortise_length_in', { precision: 10, scale: 4 }).notNull(),
   mortise_width_in: decimal('mortise_width_in', { precision: 10, scale: 4 }).notNull(),
   edge_distance_in: decimal('edge_distance_in', { precision: 10, scale: 4 }).notNull(),
+  edge_position: text('edge_position', { enum: ['left', 'right'] }).notNull(),
   extension_length_in: decimal('extension_length_in', { precision: 10, scale: 4 }).notNull(),
   extension_width_in: decimal('extension_width_in', { precision: 10, scale: 4 }).notNull(),
   created_at: timestamp('created_at').defaultNow(),

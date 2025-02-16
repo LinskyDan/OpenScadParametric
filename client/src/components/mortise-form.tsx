@@ -20,7 +20,7 @@ const defaultValues: MortiseTemplate = {
   mortise_length_in: 1.75,
   mortise_width_in: 0.375,
   edge_distance_in: 0.25,
-  
+  edge_position: "right",
   extension_length_in: 3.0,
   extension_width_in: 3.0,
 };
@@ -229,7 +229,27 @@ export function MortiseForm() {
               )}
             />
 
-            
+            <FormField
+              control={form.control}
+              name="edge_position"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Edge Position</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select edge position" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="left">Left</SelectItem>
+                      <SelectItem value="right">Right</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Position of the edge fence</FormDescription>
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
@@ -291,43 +311,13 @@ export function MortiseForm() {
             <DialogTitle>Preview Mortise Template</DialogTitle>
           </DialogHeader>
           {previewUrl && (
-            <div className="aspect-square w-full bg-black/5 rounded-lg overflow-hidden relative">
-              {mutation.isPending ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-                </div>
-              ) : (
-                <StlViewer
-                  key={previewUrl}
-                  url={previewUrl}
-                  style={{ width: '100%', height: '100%' }}
-                  orbitControls
-                  shadows
-                  modelProps={{ 
-                    scale: 1,
-                    rotationX: 0,
-                    rotationY: 0,
-                    rotationZ: 0
-                  }}
-                  rendererOptions={{
-                    antialias: true,
-                    alpha: true,
-                    preserveDrawingBuffer: true,
-                    powerPreference: "default",
-                    failIfMajorPerformanceCaveat: false
-                  }}
-                  onError={(e) => {
-                    console.error('STL Viewer error:', e);
-                    toast({
-                      title: "Error",
-                      description: "Failed to load preview. Please try again.",
-                      variant: "destructive",
-                    });
-                    setShowPreview(false);
-                  }}
-                  className="bg-white"
-                />
-              )}
+            <div className="aspect-square w-full bg-black/5 rounded-lg overflow-hidden">
+              <StlViewer
+                url={previewUrl}
+                style={{ width: '100%', height: '100%' }}
+                orbitControls
+                shadows
+              />
             </div>
           )}
           <Button onClick={downloadFile} className="mt-4">

@@ -86,7 +86,7 @@ bit_diameter_in = ${params.bit_diameter_in};       // Outside diameter of the ro
 mortise_length_in = ${params.mortise_length_in};     // Desired mortise length
 mortise_width_in = ${params.mortise_width_in};     // Desired mortise width
 edge_distance_in = ${params.edge_distance_in};      // Distance from the inside of the raised edge fence
-edge_position = "right";      // Fixed to right side
+edge_position = "${params.edge_position}";      // Options: "left" or "right"
 extension_length_in = ${params.extension_length_in};    // Extra length beyond the cutout (inches)
 extension_width_in = ${params.extension_width_in};     // Extra width beyond the cutout, opposite the fence (inches)
 
@@ -207,20 +207,14 @@ difference() {
       const stlFile = path.join(tempDir, `mortise_${timestamp}.stl`);
       const scadContent = await this.generateOpenSCADContent(params);
       await fs.writeFile(scadFile, scadContent);
-      
-      // Add timeout and improved error handling
-      try {
-        await execAsync(`openscad -o "${stlFile}" "${scadFile}"`, { timeout: 30000 });
-        const stlContent = await fs.readFile(stlFile);
-        await fs.unlink(scadFile).catch(console.error);
-        return {
-          filePath: stlFile,
-          content: stlContent
-        };
-      } catch (openscadError) {
-        console.error('OpenSCAD error:', openscadError);
-        throw new Error('Failed to generate STL file');
-      }
+      await execAsync(`openscad -o "${stlFile}" "${scadFile}"`);
+      const stlContent = await fs.readFile(stlFile);
+      await fs.unlink(scadFile);
+
+      return {
+        filePath: stlFile,
+        content: stlContent
+      };
     } catch (error) {
       console.error('Error generating STL:', error);
       throw new Error('Failed to generate STL file');
