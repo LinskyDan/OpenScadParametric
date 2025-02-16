@@ -207,14 +207,20 @@ difference() {
       const stlFile = path.join(tempDir, `mortise_${timestamp}.stl`);
       const scadContent = await this.generateOpenSCADContent(params);
       await fs.writeFile(scadFile, scadContent);
-      await execAsync(`openscad -o "${stlFile}" "${scadFile}"`);
-      const stlContent = await fs.readFile(stlFile);
-      await fs.unlink(scadFile);
-
-      return {
-        filePath: stlFile,
-        content: stlContent
-      };
+      
+      // Add timeout and improved error handling
+      try {
+        await execAsync(`openscad -o "${stlFile}" "${scadFile}"`, { timeout: 30000 });
+        const stlContent = await fs.readFile(stlFile);
+        await fs.unlink(scadFile).catch(console.error);
+        return {
+          filePath: stlFile,
+          content: stlContent
+        };
+      } catch (openscadError) {
+        console.error('OpenSCAD error:', openscadError);
+        throw new Error('Failed to generate STL file');
+      }
     } catch (error) {
       console.error('Error generating STL:', error);
       throw new Error('Failed to generate STL file');
