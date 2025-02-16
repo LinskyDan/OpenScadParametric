@@ -49,6 +49,13 @@ export class DatabaseStorage implements IStorage {
     return `${wholePart}-${remainingNumerator}/${denominator}`;
   }
 
+  private formatMeasurement(value: number, unitSystem: string): string {
+    if (unitSystem === "metric") {
+      return `${value.toFixed(1)}mm`;
+    }
+    return `${this.decimalToFraction(value)}"`;
+  }
+
   private async generateOpenSCADContent(params: MortiseTemplate): Promise<string> {
     const textDepth = 0.75;
     const scale_factor = 25.4;
@@ -59,12 +66,17 @@ export class DatabaseStorage implements IStorage {
     const offset_mm = (bushing_OD - bit_diameter) / 2;
     const offset_inches = offset_mm / scale_factor;
 
-    const bushingOD = this.decimalToFraction(params.bushing_OD_in);
-    const bitDiameter = this.decimalToFraction(params.bit_diameter_in);
-    const mortiseLength = this.decimalToFraction(params.mortise_length_in);
-    const mortiseWidth = this.decimalToFraction(params.mortise_width_in);
-    const edgeDistance = this.decimalToFraction(params.edge_distance_in);
-    const offsetFraction = this.decimalToFraction(offset_inches);
+    const displayValue = (value: number) => {
+      return params.unit_system === "metric" 
+        ? (value * scale_factor).toFixed(1)
+        : this.decimalToFraction(value);
+    };
+
+    const displayOffset = params.unit_system === "metric" 
+      ? offset_mm.toFixed(1)
+      : this.decimalToFraction(offset_inches);
+
+    const unitSuffix = params.unit_system === "metric" ? "mm" : "\"";
 
     return `
 // User Inputs (In Inches)
@@ -140,17 +152,17 @@ module rounded_rectangle(length, width, radius) {
 module template_text() {
     translate([text_start_x, text_start_y, template_thickness - text_depth]) {
         linear_extrude(height = text_depth + 0.1) {
-            text(str("Bushing OD: ", "${bushingOD}", "\\""), size = text_size, halign = "left");
+            text(str("Bushing OD: ", "${displayValue(params.bushing_OD_in)}${unitSuffix}"), size = text_size, halign = "left");
             translate([0, -line_spacing, 0])
-                text(str("Bit Dia: ", "${bitDiameter}", "\\""), size = text_size, halign = "left");
+                text(str("Bit Dia: ", "${displayValue(params.bit_diameter_in)}${unitSuffix}"), size = text_size, halign = "left");
             translate([0, -2*line_spacing, 0])
-                text(str("Length: ", "${mortiseLength}", "\\""), size = text_size, halign = "left");
+                text(str("Length: ", "${displayValue(params.mortise_length_in)}${unitSuffix}"), size = text_size, halign = "left");
             translate([0, -3*line_spacing, 0])
-                text(str("Width: ", "${mortiseWidth}", "\\""), size = text_size, halign = "left");
+                text(str("Width: ", "${displayValue(params.mortise_width_in)}${unitSuffix}"), size = text_size, halign = "left");
             translate([0, -4*line_spacing, 0])
-                text(str("Edge Dist: ", "${edgeDistance}", "\\""), size = text_size, halign = "left");
+                text(str("Edge Dist: ", "${displayValue(params.edge_distance_in)}${unitSuffix}"), size = text_size, halign = "left");
             translate([0, -5*line_spacing, 0])
-                text(str("Offset: ", "${offsetFraction}", "\\""), size = text_size, halign = "left");
+                text(str("Offset: ", "${displayOffset}${unitSuffix}"), size = text_size, halign = "left");
         }
     }
 }
@@ -217,6 +229,7 @@ difference() {
       edge_position: template.edge_position,
       extension_length_in: template.extension_length_in,
       extension_width_in: template.extension_width_in,
+      unit_system: template.unit_system
     });
   }
 
@@ -231,6 +244,7 @@ difference() {
       edge_position: template.edge_position,
       extension_length_in: Number(template.extension_length_in),
       extension_width_in: Number(template.extension_width_in),
+      unit_system: template.unit_system
     }));
   }
 }

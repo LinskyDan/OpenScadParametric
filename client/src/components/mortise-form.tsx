@@ -14,6 +14,7 @@ import { useState } from "react";
 import { StlViewer } from "react-stl-viewer";
 
 const defaultValues: MortiseTemplate = {
+  unit_system: "imperial",
   bushing_OD_in: 0.3125,
   bit_diameter_in: 0.25,
   mortise_length_in: 1.75,
@@ -24,6 +25,9 @@ const defaultValues: MortiseTemplate = {
   extension_width_in: 3.0,
 };
 
+const mmToInch = (mm: number) => mm / 25.4;
+const inchToMm = (inch: number) => inch * 25.4;
+
 export function MortiseForm() {
   const { toast } = useToast();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -33,6 +37,17 @@ export function MortiseForm() {
     resolver: zodResolver(formSchema),
     defaultValues,
   });
+
+  const unitSystem = form.watch("unit_system");
+
+  const getStepSize = () => unitSystem === "imperial" ? 0.0625 : 0.1;
+  const formatValue = (value: number) => unitSystem === "imperial" ? value : inchToMm(value);
+  const parseValue = (value: string) => {
+    const num = parseFloat(value);
+    return unitSystem === "imperial" ? num : mmToInch(num);
+  };
+
+  const getUnitLabel = () => unitSystem === "imperial" ? "inches" : "mm";
 
   const mutation = useMutation({
     mutationFn: async (data: MortiseTemplate) => {
@@ -94,14 +109,42 @@ export function MortiseForm() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
               control={form.control}
+              name="unit_system"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Measurement System</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select measurement system" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="imperial">Imperial (inches)</SelectItem>
+                      <SelectItem value="metric">Metric (mm)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Choose your preferred measurement system</FormDescription>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="bushing_OD_in"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Bushing Outside Diameter</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.0625" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                    <Input
+                      type="number"
+                      step={getStepSize()}
+                      {...field}
+                      value={formatValue(field.value)}
+                      onChange={e => field.onChange(parseValue(e.target.value))}
+                    />
                   </FormControl>
-                  <FormDescription>Outside diameter of the guide bushing (inches)</FormDescription>
+                  <FormDescription>Outside diameter of the guide bushing ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
@@ -113,9 +156,15 @@ export function MortiseForm() {
                 <FormItem>
                   <FormLabel>Router Bit Diameter</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.0625" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                    <Input
+                      type="number"
+                      step={getStepSize()}
+                      {...field}
+                      value={formatValue(field.value)}
+                      onChange={e => field.onChange(parseValue(e.target.value))}
+                    />
                   </FormControl>
-                  <FormDescription>Outside diameter of the router bit (inches)</FormDescription>
+                  <FormDescription>Outside diameter of the router bit ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
@@ -127,9 +176,15 @@ export function MortiseForm() {
                 <FormItem>
                   <FormLabel>Mortise Length</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.125" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                    <Input
+                      type="number"
+                      step={getStepSize()}
+                      {...field}
+                      value={formatValue(field.value)}
+                      onChange={e => field.onChange(parseValue(e.target.value))}
+                    />
                   </FormControl>
-                  <FormDescription>Desired mortise length (inches)</FormDescription>
+                  <FormDescription>Desired mortise length ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
@@ -141,9 +196,15 @@ export function MortiseForm() {
                 <FormItem>
                   <FormLabel>Mortise Width</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.125" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                    <Input
+                      type="number"
+                      step={getStepSize()}
+                      {...field}
+                      value={formatValue(field.value)}
+                      onChange={e => field.onChange(parseValue(e.target.value))}
+                    />
                   </FormControl>
-                  <FormDescription>Desired mortise width (inches)</FormDescription>
+                  <FormDescription>Desired mortise width ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
@@ -155,9 +216,15 @@ export function MortiseForm() {
                 <FormItem>
                   <FormLabel>Edge Distance</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.125" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                    <Input
+                      type="number"
+                      step={getStepSize()}
+                      {...field}
+                      value={formatValue(field.value)}
+                      onChange={e => field.onChange(parseValue(e.target.value))}
+                    />
                   </FormControl>
-                  <FormDescription>Distance from the edge (inches)</FormDescription>
+                  <FormDescription>Distance from the edge ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
@@ -191,9 +258,15 @@ export function MortiseForm() {
                 <FormItem>
                   <FormLabel>Extension Length</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.125" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                    <Input
+                      type="number"
+                      step={getStepSize()}
+                      {...field}
+                      value={formatValue(field.value)}
+                      onChange={e => field.onChange(parseValue(e.target.value))}
+                    />
                   </FormControl>
-                  <FormDescription>Extra length beyond the cutout (inches)</FormDescription>
+                  <FormDescription>Extra length beyond the cutout ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
@@ -205,9 +278,15 @@ export function MortiseForm() {
                 <FormItem>
                   <FormLabel>Extension Width</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.125" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                    <Input
+                      type="number"
+                      step={getStepSize()}
+                      {...field}
+                      value={formatValue(field.value)}
+                      onChange={e => field.onChange(parseValue(e.target.value))}
+                    />
                   </FormControl>
-                  <FormDescription>Extra width beyond the cutout (inches)</FormDescription>
+                  <FormDescription>Extra width beyond the cutout ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
@@ -238,7 +317,6 @@ export function MortiseForm() {
                 style={{ width: '100%', height: '100%' }}
                 orbitControls
                 shadows
-                modelColor="#4A5568"
               />
             </div>
           )}

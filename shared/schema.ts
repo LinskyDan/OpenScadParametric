@@ -4,19 +4,21 @@ import { createInsertSchema } from "drizzle-zod";
 
 // Schema for mortise template parameters
 export const mortiseTemplateSchema = z.object({
-  bushing_OD_in: z.number().min(0.1).max(2),
-  bit_diameter_in: z.number().min(0.1).max(2),
-  mortise_length_in: z.number().min(0.1).max(10),
-  mortise_width_in: z.number().min(0.1).max(10),
-  edge_distance_in: z.number().min(0.1).max(5),
+  unit_system: z.enum(["imperial", "metric"]),
+  bushing_OD_in: z.number().min(0.1).max(50),
+  bit_diameter_in: z.number().min(0.1).max(50),
+  mortise_length_in: z.number().min(0.1).max(250),
+  mortise_width_in: z.number().min(0.1).max(250),
+  edge_distance_in: z.number().min(0.1).max(125),
   edge_position: z.enum(["left", "right"]),
-  extension_length_in: z.number().min(0.1).max(10),
-  extension_width_in: z.number().min(0.1).max(10),
+  extension_length_in: z.number().min(0.1).max(250),
+  extension_width_in: z.number().min(0.1).max(250),
 });
 
 // Database table definition
 export const mortiseTemplates = pgTable('mortise_templates', {
   id: serial('id').primaryKey(),
+  unit_system: text('unit_system', { enum: ['imperial', 'metric'] }).notNull(),
   bushing_OD_in: decimal('bushing_od_in', { precision: 10, scale: 4 }).notNull(),
   bit_diameter_in: decimal('bit_diameter_in', { precision: 10, scale: 4 }).notNull(),
   mortise_length_in: decimal('mortise_length_in', { precision: 10, scale: 4 }).notNull(),
