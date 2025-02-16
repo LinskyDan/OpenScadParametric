@@ -85,9 +85,11 @@ export class DatabaseStorage implements IStorage {
     const cutout_y = edge_thickness + edge_distance + offset;
 
     // Format measurements for display
-    const unitSuffix = params.unit_system === "metric" ? "mm" : "\\\"";
-    const formatValue = (value: number) => 
-      `${this.formatMeasurement(value, params.unit_system)}${unitSuffix}`;
+    const formatValue = (value: number) => {
+      const measurement = this.formatMeasurement(value, params.unit_system);
+      const unit = params.unit_system === "metric" ? "mm" : "\\\"";
+      return `${measurement}${unit}`;
+    };
 
     return `
 // Basic dimensions
@@ -101,7 +103,7 @@ cutout_width = ${cutout_width};
 cutout_x = ${cutout_x};
 cutout_y = ${cutout_y};
 corner_radius = ${bushing_OD / 2};
-text_depth = 0.8;
+text_depth = 1.0;
 
 // Rounded rectangle module
 module rounded_rect(length, width, height, radius) {
@@ -119,6 +121,7 @@ module rounded_rect(length, width, height, radius) {
 
 // Main template
 union() {
+    // Template base with cutout
     difference() {
         union() {
             // Base plate
@@ -133,20 +136,37 @@ union() {
     }
 
     // Add measurements text
-    color("black")
-    translate([cutout_x, cutout_y + cutout_width + 5, thickness - text_depth]) {
+    translate([cutout_x, cutout_y + cutout_width + 8, thickness - text_depth]) {
+        // Create embossed text
         linear_extrude(height = text_depth + 0.1) {
-            text("Bushing OD: ${formatValue(params.bushing_OD_in)}", size = 3);
-            translate([0, -5, 0])
-                text("Bit Dia: ${formatValue(params.bit_diameter_in)}", size = 3);
-            translate([0, -10, 0])
-                text("Length: ${formatValue(params.mortise_length_in)}", size = 3);
-            translate([0, -15, 0])
-                text("Width: ${formatValue(params.mortise_width_in)}", size = 3);
-            translate([0, -20, 0])
-                text("Edge Dist: ${formatValue(params.edge_distance_in)}", size = 3);
-            translate([0, -25, 0])
-                text("Offset: ${formatValue(offset/scale)}", size = 3);
+            // Row 1
+            text(str("Bushing OD: ${formatValue(params.bushing_OD_in)}"), 
+                size = 4, halign = "left");
+
+            // Row 2
+            translate([0, -6, 0])
+                text(str("Bit Dia: ${formatValue(params.bit_diameter_in)}"), 
+                    size = 4, halign = "left");
+
+            // Row 3
+            translate([0, -12, 0])
+                text(str("Length: ${formatValue(params.mortise_length_in)}"), 
+                    size = 4, halign = "left");
+
+            // Row 4
+            translate([0, -18, 0])
+                text(str("Width: ${formatValue(params.mortise_width_in)}"), 
+                    size = 4, halign = "left");
+
+            // Row 5
+            translate([0, -24, 0])
+                text(str("Edge Dist: ${formatValue(params.edge_distance_in)}"), 
+                    size = 4, halign = "left");
+
+            // Row 6
+            translate([0, -30, 0])
+                text(str("Offset: ${formatValue(offset/scale)}"), 
+                    size = 4, halign = "left");
         }
     }
 }
