@@ -241,7 +241,7 @@ export function MortiseForm() {
             ) : (
               <>
                 <Ruler className="mr-2 h-4 w-4" />
-                Generate Preview
+                Generate Model
               </>
             )}
           </Button>
