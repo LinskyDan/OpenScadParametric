@@ -73,7 +73,7 @@ export class DatabaseStorage implements IStorage {
     if (unitSystem === "metric") {
       return value.toFixed(1);
     }
-    return this.decimalToFraction(value) + '"';
+    return this.decimalToFraction(value) + '\\"';  // Escape the inch symbol for OpenSCAD
   }
 
   private async generateOpenSCADContent(params: MortiseTemplate): Promise<string> {
@@ -112,7 +112,7 @@ export class DatabaseStorage implements IStorage {
       mortise_length: this.formatMeasurement(params.mortise_length_in, params.unit_system),
       mortise_width: this.formatMeasurement(params.mortise_width_in, params.unit_system),
       edge_distance: this.formatMeasurement(params.edge_distance_in, params.unit_system),
-      offset: params.unit_system === "imperial" ? this.decimalToFraction(offset_in) + '"' : offset_in.toFixed(2)
+      offset: params.unit_system === "imperial" ? this.decimalToFraction(offset_in) + '\\"' : offset_in.toFixed(2)
     };
 
     return `
