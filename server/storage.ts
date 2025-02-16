@@ -118,8 +118,8 @@ template_width = mortise_width + (offset * 2) + (2 * scale_factor) + extension_w
 
 // **Correct Edge Distance Calculation from Inside Face of Edge**
 cutout_y_position = (edge_position == "left") 
-    ? edge_distance_in * scale_factor + edge_thickness  // Measured from inside face of left edge
-    : template_width - edge_distance_in * scale_factor - cutout_width - edge_thickness; // Measured from inside face of right edge
+    ? edge_distance_in * scale_factor  // Distance from inside face of left edge
+    : template_width - edge_distance_in * scale_factor - mortise_width - (offset * 2); // Distance from inside face of right edge
 
 // **Ensure Edge Stop Position is Always Defined**
 edge_x_offset = (edge_position == "left") ? 0 : template_width - edge_thickness;
