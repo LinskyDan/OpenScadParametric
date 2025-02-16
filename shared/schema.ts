@@ -2,7 +2,6 @@ import { z } from "zod";
 
 // Schema for mortise template parameters
 export const mortiseTemplateSchema = z.object({
-  units: z.enum(["imperial", "metric"]),
   bushing_OD_in: z.number().min(0.1).max(2),
   bit_diameter_in: z.number().min(0.1).max(2),
   mortise_length_in: z.number().min(0.1).max(10),

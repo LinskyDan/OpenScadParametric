@@ -14,7 +14,6 @@ import { useState } from "react";
 import { StlViewer } from "react-stl-viewer";
 
 const defaultValues: MortiseTemplate = {
-  units: "imperial",
   bushing_OD_in: 0.3125,
   bit_diameter_in: 0.25,
   mortise_length_in: 1.75,
@@ -92,27 +91,6 @@ export function MortiseForm() {
     <>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <FormField
-              control={form.control}
-              name="units"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Measurement Units</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select units" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="imperial">Imperial (inches)</SelectItem>
-                      <SelectItem value="metric">Metric (mm)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>Choose your preferred measurement system</FormDescription>
-                </FormItem>
-              )}
-            />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
               control={form.control}
@@ -241,7 +219,7 @@ export function MortiseForm() {
             ) : (
               <>
                 <Ruler className="mr-2 h-4 w-4" />
-                Generate Model
+                Generate Preview
               </>
             )}
           </Button>
