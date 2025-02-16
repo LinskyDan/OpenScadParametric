@@ -135,8 +135,8 @@ difference() {
     translate([cutout_x, cutout_y, -0.1])
         rounded_rect(cutout_length, cutout_width, thickness + 0.2, corner_radius);
 
-    // Text engravings - positioned to the right of cutout
-    translate([cutout_x + cutout_length + 10, cutout_y, thickness - 0.5]) {
+    // Text engravings - positioned to the right of cutout with more spacing
+    translate([cutout_x + cutout_length + 20, total_width/2, thickness - 0.5]) {
         linear_extrude(height = 1.0) {
             // Each text line positioned with proper spacing
             text(str("Bushing OD: ", "${formatted.bushing_OD}"), 
