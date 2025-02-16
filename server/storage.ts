@@ -87,6 +87,7 @@ export class DatabaseStorage implements IStorage {
 
     // Calculate offset
     const offset = (bushing_OD - bit_diameter) / 2;
+    const offset_in = offset / scale; // Convert back to inches for display
     const cutout_length = mortise_length + (offset * 2);
     const cutout_width = mortise_width + (offset * 2);
 
@@ -105,7 +106,7 @@ export class DatabaseStorage implements IStorage {
       mortise_length: this.formatMeasurement(params.mortise_length_in, params.unit_system),
       mortise_width: this.formatMeasurement(params.mortise_width_in, params.unit_system),
       edge_distance: this.formatMeasurement(params.edge_distance_in, params.unit_system),
-      offset: this.formatMeasurement(offset/scale, params.unit_system)
+      offset: params.unit_system === "imperial" ? this.decimalToFraction(offset_in) : offset_in.toFixed(2)
     };
 
     return `
