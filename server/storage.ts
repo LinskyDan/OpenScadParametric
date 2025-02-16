@@ -123,25 +123,21 @@ module rounded_rect(length, width, height, radius) {
 }
 
 // Main template
-union() {
-    // Base template with cutout
-    difference() {
-        union() {
-            // Base plate
-            cube([total_length, total_width, thickness]);
-            // Edge stop
-            cube([total_length, edge_thickness, thickness + edge_height]);
-        }
-
-        // Mortise cutout
-        translate([cutout_x, cutout_y, -0.1])
-            rounded_rect(cutout_length, cutout_width, thickness + 0.2, corner_radius);
+difference() {
+    union() {
+        // Base plate
+        cube([total_length, total_width, thickness]);
+        // Edge stop
+        cube([total_length, edge_thickness, thickness + edge_height]);
     }
 
-    // Add measurements text - positioned to the right of cutout
+    // Mortise cutout
+    translate([cutout_x, cutout_y, -0.1])
+        rounded_rect(cutout_length, cutout_width, thickness + 0.2, corner_radius);
+
+    // Text engravings - positioned to the right of cutout
     translate([cutout_x + cutout_length + 10, cutout_y, thickness - 0.5]) {
-        rotate([0, 180, 0]) // Flip text to be readable from top
-        linear_extrude(height = 0.6) {
+        linear_extrude(height = 1.0) {
             // Each text line positioned with proper spacing
             text(str("Bushing OD: ", "${formatted.bushing_OD}"), 
                 size = 3, halign = "left");
