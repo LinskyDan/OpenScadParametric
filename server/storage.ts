@@ -20,33 +20,40 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   private decimalToFraction(decimal: number): string {
     const tolerance = 1.0E-6;
-    let numerator = 1;
-    let denominator = 1;
-    let bestError = Math.abs(decimal - numerator / denominator);
-    let maxDenominator = 16; 
+    let h = [0, 1, 0];
+    let k = [1, 0, 0];
+    let a = Math.floor(decimal);
+    let x = decimal - a;
+    let n = 0;
 
-    for (let d = 1; d <= maxDenominator; d++) {
-      const n = Math.round(decimal * d);
-      const error = Math.abs(decimal - n / d);
-      if (error < bestError) {
-        bestError = error;
-        numerator = n;
-        denominator = d;
-      }
+    while (x !== 0 && n < 10) {
+      n++;
+      x = 1 / x;
+      a = Math.floor(x);
+
+      const hn = a * h[1] + h[0];
+      const kn = a * k[1] + k[0];
+
+      h = [h[1], hn, h[0]];
+      k = [k[1], kn, k[0]];
+
+      x = x - a;
     }
+
+    const numerator = h[1];
+    const denominator = k[1];
+    const wholePart = Math.floor(decimal);
 
     if (denominator === 1) {
       return `${numerator}`;
     }
 
-    const wholePart = Math.floor(numerator / denominator);
-    const remainingNumerator = numerator % denominator;
-
     if (wholePart === 0) {
-      return `${remainingNumerator}/${denominator}`;
+      return `${numerator}/${denominator}`;
     }
 
-    return `${wholePart}-${remainingNumerator}/${denominator}`;
+    const fractionalNumerator = numerator - (wholePart * denominator);
+    return `${wholePart}-${fractionalNumerator}/${denominator}`;
   }
 
   private formatMeasurement(value: number, unitSystem: string): string {
@@ -92,7 +99,7 @@ export class DatabaseStorage implements IStorage {
     };
 
     return `
-// Basic dimensions
+// Dimensions in mm
 total_length = ${total_length};
 total_width = ${total_width};
 thickness = ${template_thickness};
@@ -103,7 +110,6 @@ cutout_width = ${cutout_width};
 cutout_x = ${cutout_x};
 cutout_y = ${cutout_y};
 corner_radius = ${bushing_OD / 2};
-text_depth = 1.0;
 
 // Rounded rectangle module
 module rounded_rect(length, width, height, radius) {
@@ -121,7 +127,7 @@ module rounded_rect(length, width, height, radius) {
 
 // Main template
 union() {
-    // Template base with cutout
+    // Base template with cutout
     difference() {
         union() {
             // Base plate
@@ -136,37 +142,30 @@ union() {
     }
 
     // Add measurements text
-    translate([cutout_x, cutout_y + cutout_width + 8, thickness - text_depth]) {
-        // Create embossed text
-        linear_extrude(height = text_depth + 0.1) {
-            // Row 1
-            text(str("Bushing OD: ${formatValue(params.bushing_OD_in)}"), 
-                size = 4, halign = "left");
+    translate([cutout_x, cutout_y + cutout_width + 8, thickness - 1]) {
+        linear_extrude(height = 1.1) {
+            text(text="Bushing OD: ${formatValue(params.bushing_OD_in)}", 
+                size = 4, halign = "left", valign = "baseline");
 
-            // Row 2
             translate([0, -6, 0])
-                text(str("Bit Dia: ${formatValue(params.bit_diameter_in)}"), 
-                    size = 4, halign = "left");
+                text(text="Bit Dia: ${formatValue(params.bit_diameter_in)}", 
+                    size = 4, halign = "left", valign = "baseline");
 
-            // Row 3
             translate([0, -12, 0])
-                text(str("Length: ${formatValue(params.mortise_length_in)}"), 
-                    size = 4, halign = "left");
+                text(text="Length: ${formatValue(params.mortise_length_in)}", 
+                    size = 4, halign = "left", valign = "baseline");
 
-            // Row 4
             translate([0, -18, 0])
-                text(str("Width: ${formatValue(params.mortise_width_in)}"), 
-                    size = 4, halign = "left");
+                text(text="Width: ${formatValue(params.mortise_width_in)}", 
+                    size = 4, halign = "left", valign = "baseline");
 
-            // Row 5
             translate([0, -24, 0])
-                text(str("Edge Dist: ${formatValue(params.edge_distance_in)}"), 
-                    size = 4, halign = "left");
+                text(text="Edge Dist: ${formatValue(params.edge_distance_in)}", 
+                    size = 4, halign = "left", valign = "baseline");
 
-            // Row 6
             translate([0, -30, 0])
-                text(str("Offset: ${formatValue(offset/scale)}"), 
-                    size = 4, halign = "left");
+                text(text="Offset: ${formatValue(offset/scale)}", 
+                    size = 4, halign = "left", valign = "baseline");
         }
     }
 }
