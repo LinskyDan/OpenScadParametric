@@ -76,118 +76,91 @@ export class DatabaseStorage implements IStorage {
     const unitSuffix = params.unit_system === "metric" ? "mm" : "\"";
 
     return `
-// User Inputs (In Inches)
-bushing_OD_in = ${params.bushing_OD_in};       // Outside diameter of the guide bushing
-bit_diameter_in = ${params.bit_diameter_in};       // Outside diameter of the router bit
-mortise_length_in = ${params.mortise_length_in};     // Desired mortise length
-mortise_width_in = ${params.mortise_width_in};     // Desired mortise width
-edge_distance_in = ${params.edge_distance_in};      // Distance from the inside of the raised edge fence
-edge_position = "${params.edge_position}";      // Options: "left" or "right"
-extension_length_in = ${params.extension_length_in};    // Extra length beyond the cutout (inches)
-extension_width_in = ${params.extension_width_in};     // Extra width beyond the cutout, opposite the fence (inches)
-template_thickness_in = ${params.template_thickness_in};   // Thickness of the template (inches)
+// Constants and Conversion
+scale_factor = 25.4;  // mm per inch
+text_depth = 0.75;    // depth of embossed text
 
-// Constants
-edge_height_in = 0.5;           // Height of the edge stop (inches)
-edge_thickness_in = 0.375;      // Thickness of the edge stop (inches)
+// Template Parameters
+template_thickness = ${template_thickness};  // converted to mm
+bushing_OD = ${bushing_OD};                 // converted to mm
+bit_diameter = ${bit_diameter};             // converted to mm
 
-// Conversion Factor
-scale_factor = 25.4; // 1 inch = 25.4 mm
+// User Parameters (in mm)
+mortise_length = ${params.mortise_length_in} * scale_factor;
+mortise_width = ${params.mortise_width_in} * scale_factor;
+edge_distance = ${params.edge_distance_in} * scale_factor;
+extension_length = ${params.extension_length_in} * scale_factor;
+extension_width = ${params.extension_width_in} * scale_factor;
 
-// Convert to Millimeters
-bushing_OD = bushing_OD_in * scale_factor;
-bit_diameter = bit_diameter_in * scale_factor;
-mortise_length = mortise_length_in * scale_factor;
-mortise_width = mortise_width_in * scale_factor;
-template_thickness = template_thickness_in * scale_factor;
-edge_height = edge_height_in * scale_factor;
-edge_thickness = edge_thickness_in * scale_factor;
-extension_length = extension_length_in * scale_factor;
-extension_width = extension_width_in * scale_factor;
-text_depth = ${textDepth};
+// Edge Stop Parameters
+edge_height = 12.7;        // 0.5" in mm
+edge_thickness = 9.525;    // 0.375" in mm
 
-// Offset Calculation
+// Calculated Parameters
 offset = (bushing_OD - bit_diameter) / 2;
-offset_inches = offset / scale_factor;
-
-// Adjusted edge distance calculation
-adjusted_edge_distance = (edge_distance_in + offset_inches) * scale_factor;
-
-// Template Dimensions
 cutout_length = mortise_length + (offset * 2);
 cutout_width = mortise_width + (offset * 2);
 corner_radius = bushing_OD / 2;
+
+// Template Size Calculations
 template_length = cutout_length + (extension_length * 2);
-template_width = cutout_width + (2 * scale_factor) + extension_width;
+template_width = cutout_width + edge_thickness + extension_width;
 
-// Edge and Cutout Positioning
-cutout_y_position = (edge_position == "left") 
-    ? adjusted_edge_distance + edge_thickness
-    : template_width - adjusted_edge_distance - cutout_width - edge_thickness;
-edge_x_offset = (edge_position == "left") ? 0 : template_length - edge_thickness;
-cutout_x_position = (template_length - cutout_length) / 2;
+// Position Calculations
+cutout_x = (template_length - cutout_length) / 2;
+cutout_y = (edge_thickness + edge_distance + offset);
 
-// Text parameters
-text_size = 3;
-line_spacing = 5;
-text_start_x = cutout_x_position;
-text_start_y = (edge_position == "left") 
-    ? cutout_y_position + cutout_width + 10
-    : cutout_y_position - 30; 
-
-// Rounded Rectangle Module
+// Modules
 module rounded_rectangle(length, width, radius) {
     hull() {
-        translate([radius, radius, 0]) cylinder(h=template_thickness * 2, r=radius, $fn=50);
-        translate([length - radius, radius, 0]) cylinder(h=template_thickness * 2, r=radius, $fn=50);
-        translate([radius, width - radius, 0]) cylinder(h=template_thickness * 2, r=radius, $fn=50);
-        translate([length - radius, width - radius, 0]) cylinder(h=template_thickness * 2, r=radius, $fn=50);
-    }
-}
-
-// Text Module
-module template_text() {
-    translate([text_start_x, text_start_y, template_thickness - text_depth]) {
-        linear_extrude(height = text_depth + 0.1) {
-            text(str("Bushing OD: ", "${formatValue(params.bushing_OD_in)}${unitSuffix}"), size = text_size, halign = "left");
-            translate([0, -line_spacing, 0])
-                text(str("Bit Dia: ", "${formatValue(params.bit_diameter_in)}${unitSuffix}"), size = text_size, halign = "left");
-            translate([0, -2*line_spacing, 0])
-                text(str("Length: ", "${formatValue(params.mortise_length_in)}${unitSuffix}"), size = text_size, halign = "left");
-            translate([0, -3*line_spacing, 0])
-                text(str("Width: ", "${formatValue(params.mortise_width_in)}${unitSuffix}"), size = text_size, halign = "left");
-            translate([0, -4*line_spacing, 0])
-                text(str("Edge Dist: ", "${formatValue(params.edge_distance_in)}${unitSuffix}"), size = text_size, halign = "left");
-            translate([0, -5*line_spacing, 0])
-                text(str("Offset: ", "${this.formatMeasurement(offset_inches, params.unit_system)}${unitSuffix}"), size = text_size, halign = "left");
+        for (x = [radius, length - radius]) {
+            for (y = [radius, width - radius]) {
+                translate([x, y, 0])
+                    cylinder(h = template_thickness * 2, r = radius, center = false, $fn = 50);
+            }
         }
     }
 }
 
-// Template Base Module
-module mortise_template() {
-    difference() {
-        // Base Template
-        cube([template_length, template_width, template_thickness]); 
+module template_text() {
+    text_size = 3;
+    line_spacing = 4;
+    text_x = cutout_x;
+    text_y = cutout_y + cutout_width + 5;
 
-        // Mortise Cutout
-        translate([cutout_x_position, cutout_y_position, -0.1])
-            rounded_rectangle(cutout_length, cutout_width, corner_radius);
+    translate([text_x, text_y, template_thickness - text_depth]) {
+        linear_extrude(height = text_depth + 0.1) {
+            text(str("Bushing OD: ", "${formatValue(params.bushing_OD_in)}", "${unitSuffix}"), size = text_size);
+            translate([0, -line_spacing * 1, 0])
+                text(str("Bit Dia: ", "${formatValue(params.bit_diameter_in)}", "${unitSuffix}"), size = text_size);
+            translate([0, -line_spacing * 2, 0])
+                text(str("Length: ", "${formatValue(params.mortise_length_in)}", "${unitSuffix}"), size = text_size);
+            translate([0, -line_spacing * 3, 0])
+                text(str("Width: ", "${formatValue(params.mortise_width_in)}", "${unitSuffix}"), size = text_size);
+            translate([0, -line_spacing * 4, 0])
+                text(str("Edge Dist: ", "${formatValue(params.edge_distance_in)}", "${unitSuffix}"), size = text_size);
+            translate([0, -line_spacing * 5, 0])
+                text(str("Offset: ", "${this.formatMeasurement(offset_inches, params.unit_system)}", "${unitSuffix}"), size = text_size);
+        }
     }
 }
 
-// Edge Stop Module
-module edge_stop() {
-    translate([0, edge_x_offset, template_thickness]) 
-        cube([template_length, edge_thickness, edge_height]);
-}
-
-// Render Everything
+// Main Template
 difference() {
     union() {
-        mortise_template();
-        edge_stop();
+        // Base plate
+        cube([template_length, template_width, template_thickness]);
+
+        // Edge stop
+        translate([0, 0, template_thickness])
+            cube([template_length, edge_thickness, edge_height]);
     }
+
+    // Mortise cutout
+    translate([cutout_x, cutout_y, -0.1])
+        rounded_rectangle(cutout_length, cutout_width, corner_radius);
+
+    // Add text
     template_text();
 }
 `;
