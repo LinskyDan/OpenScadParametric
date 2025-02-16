@@ -85,9 +85,9 @@ export class DatabaseStorage implements IStorage {
     const cutout_y = edge_thickness + edge_distance + offset;
 
     // Format measurements for display
-    const unitSuffix = params.unit_system === "metric" ? "mm" : "\"";
+    const unitSuffix = params.unit_system === "metric" ? "mm" : "\\\"";
     const formatValue = (value: number) => 
-      this.formatMeasurement(value, params.unit_system) + unitSuffix;
+      `${this.formatMeasurement(value, params.unit_system)}${unitSuffix}`;
 
     return `
 // Basic dimensions
@@ -117,47 +117,39 @@ module rounded_rect(length, width, height, radius) {
     }
 }
 
-// Text module
-module template_text() {
-    text_size = 3;
-    line_spacing = 4;
-    text_x = cutout_x;
-    text_y = cutout_y + cutout_width + 5;
+// Main template
+union() {
+    difference() {
+        union() {
+            // Base plate
+            cube([total_length, total_width, thickness]);
+            // Edge stop
+            cube([total_length, edge_thickness, thickness + edge_height]);
+        }
 
-    translate([text_x, text_y, thickness - text_depth]) {
+        // Mortise cutout
+        translate([cutout_x, cutout_y, -0.1])
+            rounded_rect(cutout_length, cutout_width, thickness + 0.2, corner_radius);
+    }
+
+    // Add measurements text
+    color("black")
+    translate([cutout_x, cutout_y + cutout_width + 5, thickness - text_depth]) {
         linear_extrude(height = text_depth + 0.1) {
-            text("Bushing OD: ${formatValue(params.bushing_OD_in)}", size = text_size);
-            translate([0, -line_spacing * 1, 0])
-                text("Bit Dia: ${formatValue(params.bit_diameter_in)}", size = text_size);
-            translate([0, -line_spacing * 2, 0])
-                text("Length: ${formatValue(params.mortise_length_in)}", size = text_size);
-            translate([0, -line_spacing * 3, 0])
-                text("Width: ${formatValue(params.mortise_width_in)}", size = text_size);
-            translate([0, -line_spacing * 4, 0])
-                text("Edge Dist: ${formatValue(params.edge_distance_in)}", size = text_size);
-            translate([0, -line_spacing * 5, 0])
-                text("Offset: ${formatValue(offset/scale)}", size = text_size);
+            text("Bushing OD: ${formatValue(params.bushing_OD_in)}", size = 3);
+            translate([0, -5, 0])
+                text("Bit Dia: ${formatValue(params.bit_diameter_in)}", size = 3);
+            translate([0, -10, 0])
+                text("Length: ${formatValue(params.mortise_length_in)}", size = 3);
+            translate([0, -15, 0])
+                text("Width: ${formatValue(params.mortise_width_in)}", size = 3);
+            translate([0, -20, 0])
+                text("Edge Dist: ${formatValue(params.edge_distance_in)}", size = 3);
+            translate([0, -25, 0])
+                text("Offset: ${formatValue(offset/scale)}", size = 3);
         }
     }
 }
-
-// Main template
-difference() {
-    union() {
-        // Base plate
-        cube([total_length, total_width, thickness]);
-
-        // Edge stop
-        cube([total_length, edge_thickness, thickness + edge_height]);
-    }
-
-    // Mortise cutout
-    translate([cutout_x, cutout_y, -0.1])
-        rounded_rect(cutout_length, cutout_width, thickness + 0.2, corner_radius);
-}
-
-// Add text
-template_text();
 `;
   }
 
@@ -172,6 +164,10 @@ template_text();
 
       console.log('Generating SCAD file with params:', JSON.stringify(params, null, 2));
       const scadContent = await this.generateOpenSCADContent(params);
+
+      // Log the generated OpenSCAD content for debugging
+      console.log('Generated OpenSCAD content:', scadContent);
+
       await fs.writeFile(scadFile, scadContent);
 
       const { stdout, stderr } = await execAsync(`openscad -o "${stlFile}" "${scadFile}"`);
