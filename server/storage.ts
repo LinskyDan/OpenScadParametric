@@ -136,8 +136,8 @@ text_size = 3;
 line_spacing = 5;
 text_start_x = cutout_x_position;
 text_start_y = (edge_position == "left") 
-    ? cutout_y_position - 30
-    : cutout_y_position + cutout_width + 10; 
+    ? cutout_y_position + cutout_width + 10
+    : cutout_y_position - 30; 
 
 // Rounded Rectangle Module
 module rounded_rectangle(length, width, radius) {
