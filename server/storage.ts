@@ -85,11 +85,14 @@ export class DatabaseStorage implements IStorage {
     const cutout_x = (total_length - cutout_length) / 2;
     const cutout_y = edge_thickness + edge_distance + offset;
 
-    // Format measurements for display
-    const formatValue = (value: number) => {
-      const measurement = this.formatMeasurement(value, params.unit_system);
-      const unit = params.unit_system === "metric" ? "mm" : "\\\"";
-      return `${measurement}${unit}`;
+    // Pre-format all measurements for text
+    const formatted = {
+      bushing_OD: this.formatMeasurement(params.bushing_OD_in, params.unit_system),
+      bit_diameter: this.formatMeasurement(params.bit_diameter_in, params.unit_system),
+      mortise_length: this.formatMeasurement(params.mortise_length_in, params.unit_system),
+      mortise_width: this.formatMeasurement(params.mortise_width_in, params.unit_system),
+      edge_distance: this.formatMeasurement(params.edge_distance_in, params.unit_system),
+      offset: this.formatMeasurement(offset/scale, params.unit_system)
     };
 
     return `
@@ -135,29 +138,28 @@ union() {
             rounded_rect(cutout_length, cutout_width, thickness + 0.2, corner_radius);
     }
 
-    // Add measurements text
-    translate([cutout_x + cutout_length, cutout_y + cutout_width + 8, thickness - 0.5]) {
+    // Add measurements text - positioned to the right of cutout
+    translate([cutout_x + cutout_length + 10, cutout_y, thickness - 0.5]) {
         rotate([0, 180, 0]) // Flip text to be readable from top
-        translate([-cutout_length, 0, 0]) { // Adjust position
-            linear_extrude(height = 0.6) {
-                text(text=str("Bushing OD: ", formatValue(params.bushing_OD_in)), 
-                    size = 3, halign = "left", spacing = 1.1);
-                translate([0, -4, 0])
-                    text(text=str("Bit Dia: ", formatValue(params.bit_diameter_in)), 
-                        size = 3, halign = "left", spacing = 1.1);
-                translate([0, -8, 0])
-                    text(text=str("Length: ", formatValue(params.mortise_length_in)), 
-                        size = 3, halign = "left", spacing = 1.1);
-                translate([0, -12, 0])
-                    text(text=str("Width: ", formatValue(params.mortise_width_in)), 
-                        size = 3, halign = "left", spacing = 1.1);
-                translate([0, -16, 0])
-                    text(text=str("Edge Dist: ", formatValue(params.edge_distance_in)), 
-                        size = 3, halign = "left", spacing = 1.1);
-                translate([0, -20, 0])
-                    text(text=str("Offset: ", formatValue(offset/scale)), 
-                        size = 3, halign = "left", spacing = 1.1);
-            }
+        linear_extrude(height = 0.6) {
+            // Each text line positioned with proper spacing
+            text(str("Bushing OD: ", "${formatted.bushing_OD}"), 
+                size = 3, halign = "left");
+            translate([0, -5, 0])
+                text(str("Bit Dia: ", "${formatted.bit_diameter}"), 
+                    size = 3, halign = "left");
+            translate([0, -10, 0])
+                text(str("Length: ", "${formatted.mortise_length}"), 
+                    size = 3, halign = "left");
+            translate([0, -15, 0])
+                text(str("Width: ", "${formatted.mortise_width}"), 
+                    size = 3, halign = "left");
+            translate([0, -20, 0])
+                text(str("Edge Dist: ", "${formatted.edge_distance}"), 
+                    size = 3, halign = "left");
+            translate([0, -25, 0])
+                text(str("Offset: ", "${formatted.offset}"), 
+                    size = 3, halign = "left");
         }
     }
 }
