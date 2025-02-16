@@ -11,7 +11,7 @@ export default function Home() {
             <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
               <Ruler className="h-6 w-6 text-primary" />
             </div>
-            <CardTitle className="text-2xl font-bold">OpenSCAD Mortise Template Generator</CardTitle>
+            <CardTitle className="text-2xl font-bold">3D Mortise Template Generator</CardTitle>
           </CardHeader>
           <CardContent>
             <MortiseForm />
