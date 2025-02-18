@@ -1,27 +1,25 @@
-# Mortise Template Generator
-
-A web application for generating precise OpenSCAD mortise templates with advanced customization and visualization capabilities.
-
-## System Requirements
-
-- Node.js v20 or later
-- PostgreSQL 15 or later
-- OpenSCAD (latest stable version)
-- Modern web browser with WebGL support
-
-## Installation
-
-1. Clone the repository to your local machine
-
-2. Install OpenSCAD
-   - Linux: `sudo apt-get install openscad`
-   - macOS: `brew install openscad`
-   - Windows: Download from https://openscad.org/downloads.html
-
-3. Install project dependencies:
-```bash
 npm install
 ```
+
+## Application Structure
+
+The application has three main entry points:
+
+1. Backend Entry (`server/index.ts`):
+   - Express server setup
+   - API route handling
+   - Database connections
+   - OpenSCAD integration
+
+2. Frontend Entry (`client/index.html`):
+   - Main HTML template
+   - Loads the React application
+   - Contains viewport and meta settings
+
+3. React Entry (`client/src/main.tsx`):
+   - React application initialization
+   - Component and routing setup
+   - State management
 
 ## Database Setup
 
@@ -43,30 +41,3 @@ npm run db:push
 1. Start the development server:
 ```bash
 npm run dev
-```
-
-2. Access the application in your browser at `http://localhost:5000`
-
-## Features
-
-- Imperial and metric measurement support
-- Real-time 3D preview of templates
-- Customizable mortise dimensions
-- STL file generation for 3D printing
-- Fraction display for imperial measurements
-- Edge position customization
-
-## Configuration
-
-The application uses the following default values:
-- Default template thickness: 1/4 inch
-- Default edge height: 1/2 inch
-- Default edge thickness: 3/8 inch
-
-## Development
-
-- Frontend: React with Vite
-- Backend: Express.js
-- Database: PostgreSQL with Drizzle ORM
-- 3D Generation: OpenSCAD
-- UI Components: shadcn/ui
