@@ -7,18 +7,15 @@ command -v psql >/dev/null 2>&1 || { echo "PostgreSQL client is required but not
 
 # Create necessary directories
 mkdir -p temp
+mkdir -p dist
 
 # Install dependencies
 echo "Installing dependencies..."
 npm install
 
-# Check for .env file
-if [ ! -f .env ]; then
-    echo "Creating .env file..."
-    echo "DATABASE_URL=postgresql://username:password@localhost:5432/your_database_name" > .env
-    echo "PORT=5000" >> .env
-    echo "Please update the .env file with your database credentials"
-fi
+# Run database migrations
+echo "Running database migrations..."
+npm run db:push
 
 # Build the application
 echo "Building the application..."
@@ -26,4 +23,4 @@ npm run build
 
 # Start the application
 echo "Starting the application..."
-npm run start
+NODE_ENV=production npm run start
