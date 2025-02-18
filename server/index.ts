@@ -6,6 +6,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Enhanced logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -37,29 +38,72 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = registerRoutes(app);
+  let server: any;
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+  // Graceful shutdown handler
+  const shutdown = () => {
+    log("Initiating graceful shutdown...");
+    if (server) {
+      server.close(() => {
+        log("Server closed successfully");
+        process.exit(0);
+      });
 
-    res.status(status).json({ message });
-    throw err;
-  });
+      // Force close after 10s
+      setTimeout(() => {
+        log("Force closing server after timeout");
+        process.exit(1);
+      }, 10000);
+    }
+  };
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+  // Handle process signals
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
+
+  try {
+    log("Starting server initialization...");
+    server = registerRoutes(app);
+
+    // Error handling middleware
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      log(`Error occurred: ${status} - ${message}`);
+      res.status(status).json({ message });
+      throw err;
+    });
+
+    // Environment-specific setup
+    const isDev = app.get("env") === "development";
+    log(`Running in ${isDev ? 'development' : 'production'} mode`);
+
+    if (isDev) {
+      log("Setting up Vite development server...");
+      await setupVite(app, server);
+    } else {
+      log("Setting up static file serving for production...");
+      serveStatic(app);
+    }
+
+    const PORT = 5000;
+    log(`Attempting to bind to port ${PORT}...`);
+
+    server.listen(PORT, "0.0.0.0", () => {
+      log(`Server successfully bound to port ${PORT}`);
+    });
+
+    server.on('error', (error: any) => {
+      if (error.code === 'EADDRINUSE') {
+        log(`Port ${PORT} is already in use. Please ensure no other instance is running.`);
+        process.exit(1);
+      } else {
+        log(`Server error occurred: ${error.message}`);
+        throw error;
+      }
+    });
+  } catch (error) {
+    log(`Fatal error during server initialization: ${error}`);
+    process.exit(1);
   }
-
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client
-  const PORT = 5000;
-  server.listen(PORT, "0.0.0.0", () => {
-    log(`serving on port ${PORT}`);
-  });
 })();
