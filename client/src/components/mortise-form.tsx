@@ -9,7 +9,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } fr
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useState } from "react";
 import { StlViewer } from "react-stl-viewer";
 
@@ -304,26 +304,39 @@ export function MortiseForm() {
       </Form>
 
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Preview Mortise Template</DialogTitle>
-          </DialogHeader>
-          {previewUrl && (
-            <div className="aspect-square w-full bg-black/5 rounded-lg overflow-hidden">
-              <StlViewer
-                url={previewUrl}
-                style={{ width: '100%', height: '100%' }}
-                orbitControls
-                shadows
-              />
-            </div>
-          )}
-          <Button onClick={downloadFile} className="mt-4">
-            <Download className="mr-2 h-4 w-4" />
-            Download STL File
-          </Button>
-        </DialogContent>
-      </Dialog>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Preview Mortise Template</DialogTitle>
+                <DialogDescription>
+                  View and interact with your generated mortise template. Use mouse to rotate and zoom the 3D model.
+                </DialogDescription>
+              </DialogHeader>
+              {previewUrl ? (
+                <div className="aspect-square w-full bg-black/5 rounded-lg overflow-hidden" aria-label="3D preview of mortise template">
+                  <StlViewer
+                    url={previewUrl}
+                    style={{ width: '100%', height: '100%' }}
+                    orbitControls
+                    shadows
+                    modelProps={{
+                      scale: 1,
+                      rotationX: 0,
+                      rotationY: 0,
+                      rotationZ: 0
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center aspect-square w-full bg-black/5 rounded-lg">
+                  <p className="text-muted-foreground">Loading preview...</p>
+                </div>
+              )}
+              <Button onClick={downloadFile} className="mt-4">
+                <Download className="mr-2 h-4 w-4" />
+                Download STL File
+              </Button>
+            </DialogContent>
+          </Dialog>
     </>
   );
 }
