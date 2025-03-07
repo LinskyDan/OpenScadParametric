@@ -1,125 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-
-// Use TextDecoder instead of THREE.LoaderUtils.decodeText
-function decodeText(array) {
-  const decoder = new TextDecoder();
-  return decoder.decode(array);
-}
-
-// Custom STL loader using TextDecoder instead of THREE.LoaderUtils
-class CustomSTLLoader {
-  parse(data) {
-    const binData = this.ensureBinary(data);
-
-    // Try ASCII first
-    const text = decodeText(binData);
-    if (text.indexOf('solid') !== -1) {
-      return this.parseASCII(text);
-    } else {
-      return this.parseBinary(binData);
-    }
-  }
-
-  ensureBinary(data) {
-    if (typeof data === 'string') {
-      const array_buffer = new Uint8Array(data.length);
-      for (let i = 0; i < data.length; i++) {
-        array_buffer[i] = data.charCodeAt(i) & 0xff;
-      }
-      return array_buffer.buffer || array_buffer;
-    }
-    return data;
-  }
-
-  parseASCII(data) {
-    const geometry = new THREE.BufferGeometry();
-    const vertices = [];
-    const normals = [];
-
-    const patternSolid = /solid([\s\S]*?)endsolid/g;
-    const patternFace = /facet([\s\S]*?)endfacet/g;
-
-    let result;
-    while ((result = patternSolid.exec(data)) !== null) {
-      const solid = result[0];
-
-      while ((result = patternFace.exec(solid)) !== null) {
-        const facet = result[1];
-        const patternNormal = /normal[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g;
-
-        const patternVertex = /vertex[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g;
-
-        while ((result = patternNormal.exec(facet)) !== null) {
-          const nx = parseFloat(result[1]);
-          const ny = parseFloat(result[3]);
-          const nz = parseFloat(result[5]);
-
-          // Each face has 3 vertices
-          normals.push(nx, ny, nz);
-          normals.push(nx, ny, nz);
-          normals.push(nx, ny, nz);
-        }
-
-        while ((result = patternVertex.exec(facet)) !== null) {
-          vertices.push(parseFloat(result[1]), parseFloat(result[3]), parseFloat(result[5]));
-        }
-      }
-    }
-
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-
-    return geometry;
-  }
-
-  parseBinary(data) {
-    const geometry = new THREE.BufferGeometry();
-    const dataView = new DataView(data);
-
-    // Skip 80-byte header
-    let offset = 80;
-    const faces = dataView.getUint32(offset, true);
-    offset += 4;
-
-    const vertices = [];
-    const normals = [];
-
-    for (let i = 0; i < faces; i++) {
-      const start = offset;
-
-      // Get normal
-      const nx = dataView.getFloat32(start, true);
-      const ny = dataView.getFloat32(start + 4, true);
-      const nz = dataView.getFloat32(start + 8, true);
-
-      // Per face, not per vertex
-      for (let j = 0; j < 3; j++) {
-        normals.push(nx, ny, nz);
-      }
-
-      // Get vertices
-      for (let j = 0; j < 3; j++) {
-        const vertexStart = start + 12 + (j * 12);
-
-        vertices.push(
-          dataView.getFloat32(vertexStart, true),
-          dataView.getFloat32(vertexStart + 4, true),
-          dataView.getFloat32(vertexStart + 8, true)
-        );
-      }
-
-      // Skip the attribute byte count (2 bytes)
-      offset += 50;
-    }
-
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-
-    return geometry;
-  }
-}
+import { CustomSTLLoader } from './CustomSTLLoader';
 
 function STLViewer({ 
   url, 
@@ -135,6 +17,7 @@ function STLViewer({
   const cameraRef = useRef(null);
   const controlsRef = useRef(null);
   const modelRef = useRef(null);
+  const animationFrameRef = useRef(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -150,14 +33,16 @@ function STLViewer({
     cameraRef.current = camera;
     camera.position.z = 5;
 
-    // Renderer setup
+    // Renderer setup with preserveDrawingBuffer for context loss
     const renderer = new THREE.WebGLRenderer({ 
       antialias: true,
       powerPreference: 'high-performance',
-      preserveDrawingBuffer: true
+      preserveDrawingBuffer: true,
+      alpha: true
     });
     rendererRef.current = renderer;
     renderer.setSize(width, height);
+    renderer.setPixelRatio(window.devicePixelRatio);
 
     // Handle context loss
     const canvas = renderer.domElement;
@@ -165,24 +50,28 @@ function STLViewer({
       event.preventDefault();
       console.log('WebGL context lost, attempting to restore');
 
-      // Stop animation loop
-      if (rendererRef.current) {
-        rendererRef.current.setAnimationLoop(null);
+      // Cancel animation loop
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
-    });
+
+      // Signal that we'll handle context restoration
+      return true;
+    }, false);
 
     canvas.addEventListener('webglcontextrestored', function() {
       console.log('WebGL context restored');
 
-      // Restart animation loop
-      if (rendererRef.current && sceneRef.current && cameraRef.current) {
-        const animate = () => {
-          if (controlsRef.current) controlsRef.current.update();
-          rendererRef.current.render(sceneRef.current, cameraRef.current);
-        };
-        rendererRef.current.setAnimationLoop(animate);
+      // Rebuild the renderer
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(window.devicePixelRatio);
+
+      // Re-render the scene
+      if (sceneRef.current && cameraRef.current) {
+        startAnimation();
       }
-    });
+    }, false);
 
     containerRef.current.appendChild(canvas);
 
@@ -208,6 +97,16 @@ function STLViewer({
       controls.maxPolarAngle = Math.PI;
       controls.update();
     }
+
+    // Start animation loop
+    const startAnimation = () => {
+      const animate = () => {
+        if (controlsRef.current) controlsRef.current.update();
+        renderer.render(scene, camera);
+        animationFrameRef.current = requestAnimationFrame(animate);
+      };
+      animate();
+    };
 
     // Load STL
     fetch(url)
@@ -247,10 +146,20 @@ function STLViewer({
               shininess: 200
             });
             const mesh = new THREE.Mesh(geometry, material);
+
+            // Remove any existing model
+            if (modelRef.current) {
+              scene.remove(modelRef.current);
+              modelRef.current.geometry.dispose();
+              modelRef.current.material.dispose();
+            }
+
             scene.add(mesh);
             modelRef.current = mesh;
-
             setLoading(false);
+
+            // Start animation loop
+            startAnimation();
           } catch (error) {
             console.error('Error parsing STL:', error);
           }
@@ -260,16 +169,11 @@ function STLViewer({
         console.error('Error loading STL:', error);
       });
 
-    // Animation loop
-    const animate = () => {
-      if (controlsRef.current) controlsRef.current.update();
-      renderer.render(scene, camera);
-    };
-    renderer.setAnimationLoop(animate);
-
     // Cleanup
     return () => {
-      renderer.setAnimationLoop(null);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
 
       if (containerRef.current && containerRef.current.contains(canvas)) {
         containerRef.current.removeChild(canvas);
@@ -282,6 +186,10 @@ function STLViewer({
       }
 
       renderer.dispose();
+
+      // Clean up event listeners
+      canvas.removeEventListener('webglcontextlost', () => {});
+      canvas.removeEventListener('webglcontextrestored', () => {});
     };
   }, [url, width, height, backgroundColor, modelColor, orbitControls]);
 

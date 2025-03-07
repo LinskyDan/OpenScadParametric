@@ -42,8 +42,8 @@ class CustomSTLLoader extends THREE.Loader {
       }
 
       // Check if first 5 characters suggest ASCII STL
-      const solid = decoder.decode(new Uint8Array(data, 0, 5)).toLowerCase();
-      return solid !== 'solid';
+      const text = decoder.decode(new Uint8Array(data, 0, 5)).toLowerCase();
+      return text !== 'solid';
     }
 
     function parseBinary(data) {
@@ -56,28 +56,55 @@ class CustomSTLLoader extends THREE.Loader {
       const defaultB = 0.5;
 
       const geometry = new THREE.BufferGeometry();
-      const vertices = [];
+      const positions = [];
       const normals = [];
+      const colors = [];
+
+      const dataOffset = 84;
+      const faceLength = 12 * 4 + 2;
 
       for (let face = 0; face < faces; face++) {
-        const start = 80 + 4 + (face * 50);
+        const start = dataOffset + face * faceLength;
         const normalX = reader.getFloat32(start, true);
         const normalY = reader.getFloat32(start + 4, true);
         const normalZ = reader.getFloat32(start + 8, true);
 
+        // Flat face normals
         for (let i = 1; i <= 3; i++) {
-          const vertexStart = start + 12 * i;
-          const vertexX = reader.getFloat32(vertexStart, true);
-          const vertexY = reader.getFloat32(vertexStart + 4, true);
-          const vertexZ = reader.getFloat32(vertexStart + 8, true);
-
-          vertices.push(vertexX, vertexY, vertexZ);
           normals.push(normalX, normalY, normalZ);
+        }
+
+        // Face colors (if any)
+        const packedColor = reader.getUint16(start + 48, true);
+        if ((packedColor & 0x8000) === 0) {
+          // Use colors from STL if available
+          r = (packedColor & 0x1F) / 31;
+          g = ((packedColor >> 5) & 0x1F) / 31;
+          b = ((packedColor >> 10) & 0x1F) / 31;
+        } else {
+          // Use default colors
+          r = defaultR;
+          g = defaultG;
+          b = defaultB;
+        }
+
+        // Vertices
+        for (let i = 0; i < 3; i++) {
+          const vertexStart = start + 12 + (i * 12);
+          const x = reader.getFloat32(vertexStart, true);
+          const y = reader.getFloat32(vertexStart + 4, true);
+          const z = reader.getFloat32(vertexStart + 8, true);
+          positions.push(x, y, z);
+          colors.push(r, g, b);
         }
       }
 
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
       geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+
+      if (colors.length > 0) {
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      }
 
       return geometry;
     }
@@ -85,35 +112,45 @@ class CustomSTLLoader extends THREE.Loader {
     function parseASCII(data) {
       const text = decoder.decode(data);
       const geometry = new THREE.BufferGeometry();
-      const patternFace = /facet([\s\S]*?)endfacet/g;
-      
-      let result;
-      const vertices = [];
+      const positions = [];
       const normals = [];
+
+      const patternFace = /facet([\s\S]*?)endfacet/g;
+      let result;
 
       while ((result = patternFace.exec(text)) !== null) {
         const patternNormal = /normal[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g;
         const patternVertex = /vertex[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g;
-        
-        let resultNormal = patternNormal.exec(result[0]);
-        while ((resultVertex = patternVertex.exec(result[0])) !== null) {
-          vertices.push(parseFloat(resultVertex[1]), parseFloat(resultVertex[3]), parseFloat(resultVertex[5]));
-          normals.push(parseFloat(resultNormal[1]), parseFloat(resultNormal[3]), parseFloat(resultNormal[5]));
+
+        const normalResult = patternNormal.exec(result[0]);
+        if (normalResult) {
+          const nx = parseFloat(normalResult[1]);
+          const ny = parseFloat(normalResult[3]);
+          const nz = parseFloat(normalResult[5]);
+
+          let vertexResult;
+          while ((vertexResult = patternVertex.exec(result[0])) !== null) {
+            positions.push(
+              parseFloat(vertexResult[1]),
+              parseFloat(vertexResult[3]),
+              parseFloat(vertexResult[5])
+            );
+            normals.push(nx, ny, nz);
+          }
         }
       }
 
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
       geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
 
       return geometry;
     }
 
-    function ensureString(buffer) {
-      return decoder.decode(new Uint8Array(buffer));
+    if (isBinary(buffer)) {
+      return parseBinary(buffer);
+    } else {
+      return parseASCII(buffer);
     }
-
-    const binary = isBinary(buffer);
-    return binary ? parseBinary(buffer) : parseASCII(buffer);
   }
 }
 
