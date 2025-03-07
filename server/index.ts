@@ -77,7 +77,7 @@ app.use((req, res, next) => {
     });
 
     // Environment-specific setup with enhanced logging
-    const isDev = app.get("env") === "development";
+    const isDev = process.env.NODE_ENV !== "production";
     log(`Running in ${isDev ? 'development' : 'production'} mode`);
 
     if (isDev) {
@@ -90,7 +90,8 @@ app.use((req, res, next) => {
       log("Static file serving setup complete");
     }
 
-    const PORT = 5000;
+    // Use Replit-assigned port or fallback to 5000
+    const PORT = process.env.PORT || 5000;
     log(`Attempting to bind to port ${PORT}...`);
 
     server.listen(PORT, "0.0.0.0", () => {
