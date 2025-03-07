@@ -1,7 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CustomSTLLoader } from './CustomSTLLoader';
+
+interface STLViewerProps {
+  url: string;
+  width?: number;
+  height?: number;
+  modelColor?: string;
+  backgroundColor?: string;
+  orbitControls?: boolean;
+}
 
 function STLViewer({ 
   url, 
@@ -10,14 +19,14 @@ function STLViewer({
   modelColor = '#00A6D6',
   backgroundColor = '#EAEAEA',
   orbitControls = true
-}) {
-  const containerRef = useRef(null);
-  const rendererRef = useRef(null);
-  const sceneRef = useRef(null);
-  const cameraRef = useRef(null);
-  const controlsRef = useRef(null);
-  const modelRef = useRef(null);
-  const animationFrameRef = useRef(null);
+}: STLViewerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const modelRef = useRef<THREE.Mesh | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,29 +55,18 @@ function STLViewer({
 
     // Handle context loss
     const canvas = renderer.domElement;
-    canvas.addEventListener('webglcontextlost', function(event) {
+    canvas.addEventListener('webglcontextlost', (event) => {
       event.preventDefault();
-      console.log('WebGL context lost, attempting to restore');
-
-      // Cancel animation loop
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
-
-      // Signal that we'll handle context restoration
-      return true;
     }, false);
 
-    canvas.addEventListener('webglcontextrestored', function() {
-      console.log('WebGL context restored');
-
-      // Rebuild the renderer
-      renderer.setSize(width, height);
-      renderer.setPixelRatio(window.devicePixelRatio);
-
-      // Re-render the scene
-      if (sceneRef.current && cameraRef.current) {
+    canvas.addEventListener('webglcontextrestored', () => {
+      if (renderer && scene && camera) {
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(window.devicePixelRatio);
         startAnimation();
       }
     }, false);
@@ -98,11 +96,13 @@ function STLViewer({
       controls.update();
     }
 
-    // Start animation loop
+    // Animation loop
     const startAnimation = () => {
       const animate = () => {
         if (controlsRef.current) controlsRef.current.update();
-        renderer.render(scene, camera);
+        if (rendererRef.current && sceneRef.current && cameraRef.current) {
+          rendererRef.current.render(sceneRef.current, cameraRef.current);
+        }
         animationFrameRef.current = requestAnimationFrame(animate);
       };
       animate();
@@ -119,25 +119,26 @@ function STLViewer({
       .then(buffer => {
         if (containerRef.current) {
           try {
-            // Use our custom STL loader
             const loader = new CustomSTLLoader();
             const geometry = loader.parse(buffer);
 
             // Center geometry
             geometry.computeBoundingBox();
             const box = geometry.boundingBox;
-            const center = new THREE.Vector3();
-            box.getCenter(center);
-            geometry.translate(-center.x, -center.y, -center.z);
+            if (box) {
+              const center = new THREE.Vector3();
+              box.getCenter(center);
+              geometry.translate(-center.x, -center.y, -center.z);
 
-            // Normalize size
-            const maxDim = Math.max(
-              box.max.x - box.min.x,
-              box.max.y - box.min.y,
-              box.max.z - box.min.z
-            );
-            const scale = 2 / maxDim;
-            geometry.scale(scale, scale, scale);
+              // Normalize size
+              const maxDim = Math.max(
+                box.max.x - box.min.x,
+                box.max.y - box.min.y,
+                box.max.z - box.min.z
+              );
+              const scale = 2 / maxDim;
+              geometry.scale(scale, scale, scale);
+            }
 
             // Create material and mesh
             const material = new THREE.MeshPhongMaterial({
@@ -148,8 +149,8 @@ function STLViewer({
             const mesh = new THREE.Mesh(geometry, material);
 
             // Remove any existing model
-            if (modelRef.current) {
-              scene.remove(modelRef.current);
+            if (modelRef.current && sceneRef.current) {
+              sceneRef.current.remove(modelRef.current);
               modelRef.current.geometry.dispose();
               modelRef.current.material.dispose();
             }
@@ -158,7 +159,6 @@ function STLViewer({
             modelRef.current = mesh;
             setLoading(false);
 
-            // Start animation loop
             startAnimation();
           } catch (error) {
             console.error('Error parsing STL:', error);
@@ -175,21 +175,19 @@ function STLViewer({
         cancelAnimationFrame(animationFrameRef.current);
       }
 
-      if (containerRef.current && containerRef.current.contains(canvas)) {
+      if (containerRef.current && canvas.parentNode === containerRef.current) {
         containerRef.current.removeChild(canvas);
       }
 
-      if (modelRef.current) {
-        scene.remove(modelRef.current);
+      if (modelRef.current && sceneRef.current) {
+        sceneRef.current.remove(modelRef.current);
         modelRef.current.geometry.dispose();
         modelRef.current.material.dispose();
       }
 
-      renderer.dispose();
-
-      // Clean up event listeners
-      canvas.removeEventListener('webglcontextlost', () => {});
-      canvas.removeEventListener('webglcontextrestored', () => {});
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
+      }
     };
   }, [url, width, height, backgroundColor, modelColor, orbitControls]);
 
