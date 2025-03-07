@@ -7,7 +7,7 @@ class CustomSTLLoader extends THREE.Loader {
     loader.load(url, 
       (buffer) => {
         try {
-          onLoad(this.parse(buffer));
+          onLoad(this.parse(buffer as ArrayBuffer));
         } catch (e) {
           if (onError) {
             onError(e as ErrorEvent);
@@ -15,7 +15,7 @@ class CustomSTLLoader extends THREE.Loader {
         }
       },
       onProgress,
-      onError
+      onError as ((err: unknown) => void) | undefined
     );
   }
 
@@ -31,7 +31,8 @@ class CustomSTLLoader extends THREE.Loader {
     }
 
     // ASCII STL
-    return this.parseASCII(new TextDecoder().decode(buffer));
+    const decoder = new TextDecoder();
+    return this.parseASCII(decoder.decode(buffer));
   }
 
   private isBinary(buffer: ArrayBuffer): boolean {

@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Enhanced logging middleware
+// Enhanced logging middleware with request tracking
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -40,10 +40,11 @@ app.use((req, res, next) => {
 (async () => {
   let server: any;
 
-  // Graceful shutdown handler
+  // Graceful shutdown handler with enhanced logging
   const shutdown = () => {
     log("Initiating graceful shutdown...");
     if (server) {
+      log("Attempting to close server connections...");
       server.close(() => {
         log("Server closed successfully");
         process.exit(0);
@@ -64,8 +65,9 @@ app.use((req, res, next) => {
   try {
     log("Starting server initialization...");
     server = registerRoutes(app);
+    log("Routes registered successfully");
 
-    // Error handling middleware
+    // Error handling middleware with detailed logging
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
@@ -74,16 +76,18 @@ app.use((req, res, next) => {
       throw err;
     });
 
-    // Environment-specific setup
+    // Environment-specific setup with enhanced logging
     const isDev = app.get("env") === "development";
     log(`Running in ${isDev ? 'development' : 'production'} mode`);
 
     if (isDev) {
       log("Setting up Vite development server...");
       await setupVite(app, server);
+      log("Vite development server setup complete");
     } else {
       log("Setting up static file serving for production...");
       serveStatic(app);
+      log("Static file serving setup complete");
     }
 
     const PORT = 5000;
