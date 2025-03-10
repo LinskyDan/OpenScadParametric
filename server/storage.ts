@@ -39,18 +39,97 @@ export class DatabaseStorage implements IStorage {
     const extension_width = params.extension_width_in * scale;
     const template_thickness = params.template_thickness_in * scale;
 
-    // Start with a simple test shape to verify OpenSCAD functionality
+    // Fixed dimensions
+    const edge_height = 12.7; // 0.5 inches in mm
+    const edge_thickness = 9.525; // 0.375 inches in mm
+
+    // Calculate offset and dimensions
+    const offset_in = (params.bushing_OD_in - params.bit_diameter_in) / 2;
+    const offset = offset_in * scale;
+    const cutout_length = mortise_length + (offset * 2);
+    const cutout_width = mortise_width + (offset * 2);
+
+    const total_length = mortise_length + (extension_length * 2);
+    const total_width = mortise_width + edge_thickness + extension_width;
+
+    // Position calculations
+    const cutout_x = (total_length - mortise_length) / 2;
+    const cutout_y = edge_thickness + edge_distance;
+
     const scadContent = `
 // Set render quality
-$fn = 50;
+$fn = 100;
 
-// Test shape to verify OpenSCAD
-translate([-10, -10, 0])
-  cube([20, 20, 10]);
+// Main dimensions
+total_length = ${total_length};
+total_width = ${total_width};
+thickness = ${template_thickness};
+edge_height = ${edge_height};
+edge_thickness = ${edge_thickness};
 
-// Base plate
-translate([0, 0, 0])
-  cube([${extension_length}, ${extension_width}, ${template_thickness}]);
+// Mortise dimensions
+mortise_length = ${mortise_length};
+mortise_width = ${mortise_width};
+offset = ${offset};
+
+// Cutout dimensions
+cutout_x = ${cutout_x};
+cutout_y = ${cutout_y};
+cutout_length = ${cutout_length};
+cutout_width = ${cutout_width};
+
+// Rounded rectangle module
+module rounded_rect(length, width, height, radius) {
+    hull() {
+        translate([radius, radius, 0])
+            cylinder(h=height, r=radius);
+        translate([length - radius, radius, 0])
+            cylinder(h=height, r=radius);
+        translate([radius, width - radius, 0])
+            cylinder(h=height, r=radius);
+        translate([length - radius, width - radius, 0])
+            cylinder(h=height, r=radius);
+    }
+}
+
+// Guide hole module
+module guide_hole(x, y) {
+    translate([x, y, -0.1])
+        cylinder(h=thickness + 0.2, r=${bushing_OD/2});
+}
+
+// Main template module
+difference() {
+    union() {
+        // Base plate
+        cube([total_length, total_width, thickness]);
+        // Edge stop
+        cube([total_length, edge_thickness, thickness + edge_height]);
+    }
+
+    // Guide holes for mortise corners
+    guide_hole(cutout_x, cutout_y);
+    guide_hole(cutout_x + mortise_length, cutout_y);
+    guide_hole(cutout_x, cutout_y + mortise_width);
+    guide_hole(cutout_x + mortise_length, cutout_y + mortise_width);
+
+    // Text engravings
+    translate([cutout_x + mortise_length + 10, edge_thickness + 5, thickness - 0.5]) {
+        linear_extrude(height = 1.0) {
+            text(str("Mortise Template"), size = 4, halign = "left");
+            translate([0, -7, 0])
+                text(str("Length: ", "${params.mortise_length_in}\""), size = 3, halign = "left");
+            translate([0, -12, 0])
+                text(str("Width: ", "${params.mortise_width_in}\""), size = 3, halign = "left");
+            translate([0, -17, 0])
+                text(str("Edge Dist: ", "${params.edge_distance_in}\""), size = 3, halign = "left");
+            translate([0, -22, 0])
+                text(str("Bit: ", "${params.bit_diameter_in}\""), size = 3, halign = "left");
+            translate([0, -27, 0])
+                text(str("Bushing: ", "${params.bushing_OD_in}\""), size = 3, halign = "left");
+        }
+    }
+}
 `;
 
     console.log('Generated OpenSCAD content:', scadContent);
@@ -60,8 +139,7 @@ translate([0, 0, 0])
   async generateSTLFile(params: MortiseTemplate): Promise<{ filePath: string; content: Buffer }> {
     try {
       // Ensure temp directory exists with proper permissions
-      const tempDir = path.join(process.cwd(), 'temp');
-      await fs.mkdir(tempDir, { recursive: true, mode: 0o755 });
+      const tempDir = await this.ensureTempDir();
       console.log('Using temp directory:', tempDir);
 
       const timestamp = Date.now();
