@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useState } from "react";
-import STLViewer from "./STLViewer";
+import { StlViewer } from "react-stl-viewer";
 
 const defaultValues: MortiseTemplate = {
   unit_system: "imperial",
@@ -65,24 +65,19 @@ export function MortiseForm() {
           throw new Error(`Failed to generate STL file: ${response.statusText}`);
         }
 
-        const contentDisposition = response.headers.get("content-disposition");
-        const fileName = contentDisposition
-          ? contentDisposition.split("filename=")[1].replace(/"/g, "")
-          : "mortise_template.stl";
-
         const blob = await response.blob();
         if (blob.size === 0) {
           throw new Error("Generated STL file is empty");
         }
 
-        return { url: URL.createObjectURL(blob), fileName };
+        return URL.createObjectURL(blob);
       } catch (error) {
         setStlError((error as Error).message);
         throw error;
       }
     },
-    onSuccess: (data) => {
-      setPreviewUrl(data.url);
+    onSuccess: (url) => {
+      setPreviewUrl(url);
       setShowPreview(true);
       toast({
         title: "Success",
@@ -107,7 +102,6 @@ export function MortiseForm() {
 
   const handleDownload = () => {
     if (!previewUrl) return;
-
     const a = document.createElement("a");
     a.href = previewUrl;
     a.download = "mortise_template.stl";
@@ -349,15 +343,15 @@ export function MortiseForm() {
                   </div>
                 </div>
               )}
-              {previewUrl && !mutation.isPending && (
+              {previewUrl && !mutation.isPending && !stlError && (
                 <div className="h-full w-full">
-                  <STLViewer
+                  <StlViewer
                     url={previewUrl}
-                    width={600}
-                    height={400}
+                    style={{width: '100%', height: '100%'}}
+                    orbitControls
+                    showAxes={false}
                     modelColor="#3b82f6"
                     backgroundColor="#f8fafc"
-                    orbitControls={true}
                   />
                 </div>
               )}
