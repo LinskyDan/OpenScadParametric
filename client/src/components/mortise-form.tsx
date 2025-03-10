@@ -42,10 +42,19 @@ export function MortiseForm() {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const frameRef = useRef<number>(0);
+  const meshRef = useRef<THREE.Mesh | null>(null);
 
   const cleanup = () => {
     if (frameRef.current) {
       cancelAnimationFrame(frameRef.current);
+    }
+    if (meshRef.current) {
+      if (meshRef.current.geometry) {
+        meshRef.current.geometry.dispose();
+      }
+      if (meshRef.current.material instanceof THREE.Material) {
+        meshRef.current.material.dispose();
+      }
     }
     if (rendererRef.current) {
       rendererRef.current.dispose();
@@ -66,81 +75,115 @@ export function MortiseForm() {
 
     cleanup();
 
-    const width = 600;
-    const height = 400;
+    try {
+      // Scene setup
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color('#f8fafc');
+      sceneRef.current = scene;
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#f8fafc');
-    sceneRef.current = scene;
+      // Camera setup
+      const width = containerRef.current.clientWidth;
+      const height = containerRef.current.clientHeight;
+      const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+      camera.position.z = 5;
+      cameraRef.current = camera;
 
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    camera.position.z = 5;
-    cameraRef.current = camera;
+      // Renderer setup
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+      });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      rendererRef.current = renderer;
+      containerRef.current.appendChild(renderer.domElement);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(width, height);
-    rendererRef.current = renderer;
-    containerRef.current.appendChild(renderer.domElement);
+      // Controls setup
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.enableZoom = true;
+      controlsRef.current = controls;
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controlsRef.current = controls;
+      // Lighting setup
+      const ambientLight = new THREE.AmbientLight(0x404040, 1);
+      scene.add(ambientLight);
 
-    const ambientLight = new THREE.AmbientLight(0x404040);
-    scene.add(ambientLight);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(1, 1, 1);
+      scene.add(directionalLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(1, 1, 1);
-    scene.add(directionalLight);
+      const backLight = new THREE.DirectionalLight(0xffffff, 0.5);
+      backLight.position.set(-1, -1, -1);
+      scene.add(backLight);
 
-    const animate = () => {
-      frameRef.current = requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
-    };
-    animate();
+      // Animation loop
+      const animate = () => {
+        frameRef.current = requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      };
+      animate();
+
+    } catch (error) {
+      console.error('Error initializing Three.js scene:', error);
+      setStlError('Failed to initialize 3D viewer');
+    }
   };
 
   const loadSTL = async (url: string) => {
-    if (!sceneRef.current) return;
+    if (!sceneRef.current || !cameraRef.current) return;
 
     try {
       setStlError(null);
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to load STL: ${response.statusText}`);
-      }
-
-      const buffer = await response.arrayBuffer();
-      if (buffer.byteLength === 0) {
-        throw new Error('Received empty STL data');
-      }
-
-      console.log('STL data size:', buffer.byteLength, 'bytes');
 
       const loader = new STLLoader();
-      const geometry = await loader.parseAsync(buffer);
+      const geometry = await loader.loadAsync(url);
 
-      geometry.center();
+      if (!geometry.attributes.position) {
+        throw new Error('Invalid STL: No vertex data found');
+      }
 
-      const box = new THREE.Box3().setFromObject(new THREE.Mesh(geometry));
-      const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const scale = 2 / maxDim;
+      // Center and scale the geometry
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox;
+      if (!box) {
+        throw new Error('Failed to compute model boundaries');
+      }
+
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      geometry.translate(-center.x, -center.y, -center.z);
+
+      const maxDim = Math.max(
+        box.max.x - box.min.x,
+        box.max.y - box.min.y,
+        box.max.z - box.min.z
+      );
+      const scale = 3 / maxDim;
       geometry.scale(scale, scale, scale);
 
+      // Create mesh with phong material for better lighting
       const material = new THREE.MeshPhongMaterial({
         color: 0x3b82f6,
         shininess: 30,
-        specular: 0x111111
+        specular: 0x111111,
       });
-      const mesh = new THREE.Mesh(geometry, material);
 
-      sceneRef.current.clear();
+      if (meshRef.current) {
+        sceneRef.current.remove(meshRef.current);
+        meshRef.current.geometry.dispose();
+        meshRef.current.material.dispose();
+      }
+
+      const mesh = new THREE.Mesh(geometry, material);
+      meshRef.current = mesh;
       sceneRef.current.add(mesh);
 
-      if (cameraRef.current) {
-        cameraRef.current.position.z = 5;
+      // Reset camera position
+      cameraRef.current.position.set(0, 0, 5);
+      if (controlsRef.current) {
+        controlsRef.current.reset();
       }
 
     } catch (err) {
@@ -457,10 +500,10 @@ export function MortiseForm() {
             <DialogHeader>
               <DialogTitle>3D Preview</DialogTitle>
               <DialogDescription>
-                Preview your mortise template. Click and drag to rotate.
+                Preview your mortise template. Click and drag to rotate, scroll to zoom.
               </DialogDescription>
             </DialogHeader>
-            <div className="h-[400px] w-full relative bg-slate-50">
+            <div className="h-[400px] w-full relative bg-slate-50 rounded-lg overflow-hidden">
               {mutation.isPending && (
                 <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
                   <div className="text-center">
