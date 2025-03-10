@@ -11,9 +11,14 @@ export function registerRoutes(app: Express): Server {
       const params = mortiseTemplateSchema.parse(req.body);
       const { filePath, content } = await storage.generateSTLFile(params);
 
-      res.json({ previewUrl: `/api/preview/${path.basename(filePath)}` });
+      // Set proper headers for STL file
+      res.setHeader('Content-Type', 'application/sla');
+      res.setHeader('Content-Disposition', `attachment; filename="mortise_template.stl"`);
+
+      // Send the actual STL file content
+      res.send(content);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error generating STL:', error);
       res.status(400).json({ error: "Failed to generate STL file" });
     }
   });
@@ -25,9 +30,12 @@ export function registerRoutes(app: Express): Server {
       if (!exists) {
         return res.status(404).json({ error: "File not found" });
       }
+
+      // Set proper headers for STL preview
+      res.setHeader('Content-Type', 'application/sla');
       res.sendFile(filePath);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error serving preview:', error);
       res.status(500).json({ error: "Failed to serve preview file" });
     }
   });
@@ -46,7 +54,7 @@ export function registerRoutes(app: Express): Server {
         }
       });
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error downloading file:', error);
       res.status(500).json({ error: "Failed to download file" });
     }
   });

@@ -106,8 +106,20 @@ export function MortiseForm() {
 
     try {
       setStlError(null);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to load STL: ${response.statusText}`);
+      }
+
+      const buffer = await response.arrayBuffer();
+      if (buffer.byteLength === 0) {
+        throw new Error('Received empty STL data');
+      }
+
+      console.log('STL data size:', buffer.byteLength, 'bytes');
+
       const loader = new STLLoader();
-      const geometry = await loader.loadAsync(url);
+      const geometry = await loader.parseAsync(buffer);
 
       geometry.center();
 
@@ -167,7 +179,10 @@ export function MortiseForm() {
         setStlError(null);
         const response = await fetch("/api/generate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/stl" 
+          },
           body: JSON.stringify(data),
         });
 
@@ -176,12 +191,16 @@ export function MortiseForm() {
         }
 
         const blob = await response.blob();
+        console.log('Response blob size:', blob.size, 'bytes');
+        console.log('Response type:', blob.type);
+
         if (blob.size === 0) {
           throw new Error("Generated STL file is empty");
         }
 
         return URL.createObjectURL(blob);
       } catch (error) {
+        console.error('STL generation error:', error);
         setStlError((error as Error).message);
         throw error;
       }

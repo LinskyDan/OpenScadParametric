@@ -203,8 +203,16 @@ difference() {
       console.log('OpenSCAD output:', stdout);
       if (stderr) console.error('OpenSCAD stderr:', stderr);
 
+      // Verify that the STL file was created and has content
       const stlContent = await fs.readFile(stlFile);
-      await fs.unlink(scadFile); // Clean up SCAD file
+      if (stlContent.length === 0) {
+        throw new Error('Generated STL file is empty');
+      }
+
+      console.log(`Generated STL file size: ${stlContent.length} bytes`);
+
+      // Clean up SCAD file
+      await fs.unlink(scadFile);
 
       return {
         filePath: stlFile,
