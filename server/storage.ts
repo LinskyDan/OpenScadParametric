@@ -38,90 +38,19 @@ export class DatabaseStorage implements IStorage {
     const extension_length = params.extension_length_in * scale;
     const extension_width = params.extension_width_in * scale;
     const template_thickness = params.template_thickness_in * scale;
-    const edge_height = 12.7; // 0.5 inches in mm
-    const edge_thickness = 9.525; // 0.375 inches in mm
 
-    const offset_in = (params.bushing_OD_in - params.bit_diameter_in) / 2;
-    const offset = offset_in * scale;
-    const cutout_length = mortise_length + (offset * 2);
-    const cutout_width = mortise_width + (offset * 2);
-
-    const total_length = cutout_length + (extension_length * 2);
-    const total_width = cutout_width + edge_thickness + extension_width;
-
-    const cutout_x = (total_length - cutout_length) / 2;
-    const cutout_y = edge_thickness + (edge_distance - offset);
-
-    // Generate test cube to verify OpenSCAD functionality
-    const testCube = `
-// Test cube
-translate([-20, -20, 0])
-  cube([10, 10, 10]);
-`;
-
+    // Start with a simple test shape to verify OpenSCAD functionality
     const scadContent = `
 // Set render quality
-$fn = 100;
+$fn = 50;
 
-// Base dimensions in mm
-total_length = ${total_length};
-total_width = ${total_width};
-thickness = ${template_thickness};
-edge_height = ${edge_height};
-edge_thickness = ${edge_thickness};
-cutout_length = ${cutout_length};
-cutout_width = ${cutout_width};
-cutout_x = ${cutout_x};
-cutout_y = ${cutout_y};
-corner_radius = ${bushing_OD / 2};
+// Test shape to verify OpenSCAD
+translate([-10, -10, 0])
+  cube([20, 20, 10]);
 
-// Rounded rectangle module with high resolution
-module rounded_rect(length, width, height, radius) {
-    hull() {
-        translate([radius, radius, 0])
-            cylinder(h=height, r=radius);
-        translate([length - radius, radius, 0])
-            cylinder(h=height, r=radius);
-        translate([radius, width - radius, 0])
-            cylinder(h=height, r=radius);
-        translate([length - radius, width - radius, 0])
-            cylinder(h=height, r=radius);
-    }
-}
-
-// Main template
-union() {
-    difference() {
-        union() {
-            // Base plate
-            cube([total_length, total_width, thickness]);
-            // Edge stop
-            cube([total_length, edge_thickness, thickness + edge_height]);
-        }
-
-        // Mortise cutout with rounded corners
-        translate([cutout_x, cutout_y, -0.1])
-            rounded_rect(cutout_length, cutout_width, thickness + 0.2, corner_radius);
-
-        // Engraved text (measurements)
-        translate([cutout_x + cutout_length + 10, edge_thickness + 5, thickness - 0.5]) {
-            linear_extrude(height = 1.0) {
-                text(str("Mortise Template"), size = 4, halign = "left");
-                translate([0, -7, 0])
-                    text(str("Length: ${params.mortise_length_in}\\""), size = 3, halign = "left");
-                translate([0, -12, 0])
-                    text(str("Width: ${params.mortise_width_in}\\""), size = 3, halign = "left");
-                translate([0, -17, 0])
-                    text(str("Edge Dist: ${params.edge_distance_in}\\""), size = 3, halign = "left");
-                translate([0, -22, 0])
-                    text(str("Bit: ${params.bit_diameter_in}\\""), size = 3, halign = "left");
-                translate([0, -27, 0])
-                    text(str("Bushing: ${params.bushing_OD_in}\\""), size = 3, halign = "left");
-            }
-        }
-    }
-    ${testCube}
-}
+// Base plate
+translate([0, 0, 0])
+  cube([${extension_length}, ${extension_width}, ${template_thickness}]);
 `;
 
     console.log('Generated OpenSCAD content:', scadContent);
@@ -131,32 +60,40 @@ union() {
   async generateSTLFile(params: MortiseTemplate): Promise<{ filePath: string; content: Buffer }> {
     try {
       // Ensure temp directory exists with proper permissions
-      const tempDir = await this.ensureTempDir();
+      const tempDir = path.join(process.cwd(), 'temp');
+      await fs.mkdir(tempDir, { recursive: true, mode: 0o755 });
       console.log('Using temp directory:', tempDir);
 
       const timestamp = Date.now();
       const scadFile = path.join(tempDir, `mortise_${timestamp}.scad`);
       const stlFile = path.join(tempDir, `mortise_${timestamp}.stl`);
 
+      // Write SCAD file
       console.log('Writing OpenSCAD file:', scadFile);
       const scadContent = await this.generateOpenSCADContent(params);
       await fs.writeFile(scadFile, scadContent, { mode: 0o644 });
 
       try {
-        // Run OpenSCAD with verbose output
-        const openscadCmd = `openscad -o "${stlFile}" "${scadFile}" --debug all`;
-        console.log('Executing OpenSCAD command:', openscadCmd);
+        // Run OpenSCAD with detailed output
+        const cmd = `openscad -o "${stlFile}" "${scadFile}" --debug all`;
+        console.log('Executing OpenSCAD command:', cmd);
 
-        const { stdout, stderr } = await execAsync(openscadCmd);
+        const { stdout, stderr } = await execAsync(cmd, { maxBuffer: 1024 * 1024 });
         console.log('OpenSCAD stdout:', stdout);
         if (stderr) console.error('OpenSCAD stderr:', stderr);
 
-        // Verify STL file exists and read its content
+        // Check if STL file exists
+        const exists = await fs.access(stlFile).then(() => true).catch(() => false);
+        if (!exists) {
+          throw new Error('OpenSCAD failed to create STL file');
+        }
+
+        // Read STL file
         const stlContent = await fs.readFile(stlFile);
         console.log('STL file details:', {
           path: stlFile,
           size: stlContent.length,
-          exists: await fs.access(stlFile).then(() => true).catch(() => false)
+          exists
         });
 
         if (stlContent.length === 0) {
@@ -176,7 +113,7 @@ union() {
       }
     } catch (error) {
       console.error('Error in generateSTLFile:', error);
-      throw new Error(`Failed to generate STL file: ${error}`);
+      throw new Error(`Failed to generate STL file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
