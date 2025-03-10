@@ -29,77 +29,35 @@ export class DatabaseStorage implements IStorage {
 
     // Convert all measurements to millimeters for OpenSCAD
     const scale = 25.4; // inches to mm
+    const dimensions = {
+      length: params.extension_length_in * scale,
+      width: params.extension_width_in * scale,
+      thickness: params.template_thickness_in * scale,
+      mortise_length: params.mortise_length_in * scale,
+      mortise_width: params.mortise_width_in * scale
+    };
 
-    const bushing_OD = params.bushing_OD_in * scale;
-    const bit_diameter = params.bit_diameter_in * scale;
-    const mortise_length = params.mortise_length_in * scale;
-    const mortise_width = params.mortise_width_in * scale;
-    const edge_distance = params.edge_distance_in * scale;
-    const extension_length = params.extension_length_in * scale;
-    const extension_width = params.extension_width_in * scale;
-    const template_thickness = params.template_thickness_in * scale;
+    // Validate dimensions
+    Object.entries(dimensions).forEach(([key, value]) => {
+      if (value <= 0) {
+        throw new Error(`Invalid dimension: ${key} must be greater than 0`);
+      }
+    });
 
-    // Fixed dimensions
-    const edge_height = 12.7; // 0.5 inches in mm
-    const edge_thickness = 9.525; // 0.375 inches in mm
+    console.log('Calculated dimensions (mm):', dimensions);
 
-    // Calculate offset and dimensions
-    const offset_in = (params.bushing_OD_in - params.bit_diameter_in) / 2;
-    const offset = offset_in * scale;
-    const cutout_length = mortise_length + (offset * 2);
-    const cutout_width = mortise_width + (offset * 2);
-
-    // Base template dimensions
-    const total_length = mortise_length + (extension_length * 2);
-    const total_width = mortise_width + edge_thickness + extension_width;
-
-    // Position calculations
-    const cutout_x = (total_length - mortise_length) / 2;
-    const cutout_y = edge_thickness + edge_distance;
-
+    // Super simple test template - just a rectangular plate with a centered hole
     const scadContent = `
-// Set render quality
-$fn = 100;
+// Basic test template
+$fn = 50;
 
-// Main dimensions
-total_length = ${total_length};
-total_width = ${total_width};
-thickness = ${template_thickness};
-edge_height = ${edge_height};
-edge_thickness = ${edge_thickness};
-
-// Mortise dimensions
-mortise_length = ${mortise_length};
-mortise_width = ${mortise_width};
-offset = ${offset};
-
-// Guide hole module
-module guide_hole(x, y) {
-    translate([x, y, -0.1])
-        cylinder(h=thickness + 0.2, r=${bushing_OD/2});
-}
-
-// Main template
 difference() {
-    union() {
-        // Base plate
-        cube([total_length, total_width, thickness]);
-        // Edge stop
-        cube([total_length, edge_thickness, thickness + edge_height]);
-    }
+    // Base plate
+    cube([${dimensions.length}, ${dimensions.width}, ${dimensions.thickness}]);
 
-    // Guide holes for mortise corners
-    guide_hole(cutout_x, cutout_y);
-    guide_hole(cutout_x + mortise_length, cutout_y);
-    guide_hole(cutout_x, cutout_y + mortise_width);
-    guide_hole(cutout_x + mortise_length, cutout_y + mortise_width);
-
-    // Text engravings - simplified for debugging
-    translate([cutout_x + mortise_length + 5, edge_thickness + 5, thickness - 0.5]) {
-        linear_extrude(height = 1.0) {
-            text("Mortise Template", size = 4, halign = "left");
-        }
-    }
+    // Simple centered hole
+    translate([${dimensions.length/2}, ${dimensions.width/2}, -0.1])
+        cylinder(h = ${dimensions.thickness + 0.2}, r = 5);
 }
 `;
 
@@ -156,6 +114,7 @@ difference() {
           filePath: stlFile,
           content: stlContent
         };
+
       } catch (error) {
         console.error('Error during STL generation:', error);
         throw error;
