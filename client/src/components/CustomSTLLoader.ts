@@ -21,123 +21,103 @@ class CustomSTLLoader extends THREE.Loader {
 
   parse(buffer: ArrayBuffer): THREE.BufferGeometry {
     const geometry = new THREE.BufferGeometry();
-    const dataView = new DataView(buffer);
-
-    // Check if binary STL
-    const isBinary = this.isBinary(buffer);
-
-    if (isBinary) {
-      return this.parseBinary(dataView);
-    }
-
-    // ASCII STL
-    const decoder = new TextDecoder();
-    return this.parseASCII(decoder.decode(buffer));
-  }
-
-  private isBinary(buffer: ArrayBuffer): boolean {
-    const HEADER_SIZE = 84;
-    if (buffer.byteLength < HEADER_SIZE) {
-      throw new Error('STL file too small to be valid');
-    }
-
-    const dataView = new DataView(buffer);
-    const nFaces = dataView.getUint32(80, true);
-    const expectedSize = HEADER_SIZE + (50 * nFaces); // 50 = 4*12 + 2 (normal, vertices, attribute)
-
-    if (buffer.byteLength < expectedSize) {
-      throw new Error('STL file is truncated');
-    }
-
-    return true; // Assume binary if size matches
-  }
-
-  private parseBinary(dataView: DataView): THREE.BufferGeometry {
-    const geometry = new THREE.BufferGeometry();
-    const vertices: number[] = [];
-    const normals: number[] = [];
+    const little_endian = true;
 
     try {
-      // Skip header
-      const headerOffset = 80;
-      const nFaces = dataView.getUint32(headerOffset, true);
-      let offset = headerOffset + 4;
-
-      // Validate total size
-      const expectedSize = offset + (nFaces * 50);
-      if (dataView.byteLength < expectedSize) {
-        throw new Error('Invalid STL: File size does not match number of faces');
+      // First check if we have enough data for a basic STL header
+      if (buffer.byteLength < 84) {
+        throw new Error('STL file is too small to be valid');
       }
 
-      // Read each face
-      for (let face = 0; face < nFaces; face++) {
-        // Normal
-        const nx = dataView.getFloat32(offset, true);
-        const ny = dataView.getFloat32(offset + 4, true);
-        const nz = dataView.getFloat32(offset + 8, true);
-        offset += 12;
+      const reader = {
+        dv: new DataView(buffer),
+        offset: 0,
+        getUint32: function() {
+          const value = this.dv.getUint32(this.offset, little_endian);
+          this.offset += 4;
+          return value;
+        },
+        getFloat32: function() {
+          const value = this.dv.getFloat32(this.offset, little_endian);
+          this.offset += 4;
+          return value;
+        },
+        skip: function(bytes: number) {
+          this.offset += bytes;
+        }
+      };
 
-        // Three vertices per face
-        for (let i = 0; i < 3; i++) {
-          vertices.push(
-            dataView.getFloat32(offset, true),
-            dataView.getFloat32(offset + 4, true),
-            dataView.getFloat32(offset + 8, true)
-          );
-          normals.push(nx, ny, nz);
-          offset += 12;
+      // Skip the header
+      reader.skip(80);
+
+      // Read number of triangles
+      const triangles = reader.getUint32();
+      const expectedSize = 84 + (triangles * 50);
+
+      if (buffer.byteLength < expectedSize) {
+        throw new Error('STL file appears to be truncated');
+      }
+
+      if (triangles === 0) {
+        throw new Error('STL file contains no faces');
+      }
+
+      if (triangles > 5000000) {
+        throw new Error('STL file contains too many faces');
+      }
+
+      const vertices = new Float32Array(triangles * 9);
+      const normals = new Float32Array(triangles * 9);
+      let vertexIndex = 0;
+      let normalIndex = 0;
+
+      try {
+        for (let i = 0; i < triangles; i++) {
+          // Normal
+          const nx = reader.getFloat32();
+          const ny = reader.getFloat32();
+          const nz = reader.getFloat32();
+
+          // Vertices
+          for (let j = 0; j < 3; j++) {
+            const x = reader.getFloat32();
+            const y = reader.getFloat32();
+            const z = reader.getFloat32();
+
+            vertices[vertexIndex++] = x;
+            vertices[vertexIndex++] = y;
+            vertices[vertexIndex++] = z;
+
+            normals[normalIndex++] = nx;
+            normals[normalIndex++] = ny;
+            normals[normalIndex++] = nz;
+          }
+
+          // Skip attribute byte count
+          reader.skip(2);
         }
 
-        // Skip attribute byte count
-        offset += 2;
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+
+        // Compute bounding box
+        geometry.computeBoundingBox();
+
+        // Validate final geometry
+        if (!geometry.attributes.position || geometry.attributes.position.count === 0) {
+          throw new Error('Generated geometry has no vertices');
+        }
+
+        return geometry;
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('Offset')) {
+          throw new Error('Invalid STL data structure - file may be corrupted');
+        }
+        throw error;
       }
-
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-      geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-
-      return geometry;
     } catch (error) {
-      throw new Error(`Failed to parse binary STL: ${error}`);
-    }
-  }
-
-  private parseASCII(data: string): THREE.BufferGeometry {
-    const geometry = new THREE.BufferGeometry();
-    const vertices: number[] = [];
-    const normals: number[] = [];
-
-    const patternNormal = /normal[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g;
-    const patternVertex = /vertex[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g;
-
-    try {
-      let normal: RegExpExecArray | null;
-      while ((normal = patternNormal.exec(data)) !== null) {
-        normals.push(
-          parseFloat(normal[1]),
-          parseFloat(normal[3]),
-          parseFloat(normal[5])
-        );
-      }
-
-      let vertex: RegExpExecArray | null;
-      while ((vertex = patternVertex.exec(data)) !== null) {
-        vertices.push(
-          parseFloat(vertex[1]),
-          parseFloat(vertex[3]),
-          parseFloat(vertex[5])
-        );
-      }
-
-      if (vertices.length === 0) {
-        throw new Error('No vertices found in STL file');
-      }
-
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-      geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-
-      return geometry;
-    } catch (error) {
-      throw new Error(`Failed to parse ASCII STL: ${error}`);
+      console.error('STL parsing error:', error);
+      throw new Error(`Failed to parse STL file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }
