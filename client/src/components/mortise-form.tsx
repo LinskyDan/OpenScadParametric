@@ -21,7 +21,7 @@ const defaultValues: MortiseTemplate = {
   mortise_length_in: 1.75,
   mortise_width_in: 0.375,
   edge_distance_in: 0.25,
-  edge_position: "right",
+  edge_position: "left", // Fixed to left, no longer user-editable
   extension_length_in: 3.0,
   extension_width_in: 3.0,
   template_thickness_in: 0.25, // Default template thickness (1/4 inch)
@@ -226,27 +226,6 @@ export function MortiseForm() {
         <div className="space-y-4 border rounded-lg p-4">
           <h3 className="text-lg font-semibold">3. Customize Your Template</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="edge_position"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Edge Position</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select edge position" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="left">Left</SelectItem>
-                      <SelectItem value="right">Right</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>The edge the template will be aligned to</FormDescription>
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}
