@@ -1,4 +1,3 @@
-
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
@@ -12,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useState } from "react";
-import { StlViewer } from "react-stl-viewer";
+import { StlViewer as STLViewer } from "react-stl-viewer";
 
 const defaultValues: MortiseTemplate = {
   unit_system: "imperial",
@@ -21,10 +20,10 @@ const defaultValues: MortiseTemplate = {
   mortise_length_in: 1.75,
   mortise_width_in: 0.375,
   edge_distance_in: 0.25,
-  edge_position: "left", // Fixed to left, no longer user-editable
+  edge_position: "left",
   extension_length_in: 3.0,
   extension_width_in: 3.0,
-  template_thickness_in: 0.25, // Default template thickness (1/4 inch)
+  template_thickness_in: 0.25,
 };
 
 const mmToInch = (mm: number) => mm / 25.4;
@@ -63,7 +62,6 @@ export function MortiseForm() {
         throw new Error("Failed to generate STL file");
       }
 
-      // Get the file name from Content-Disposition header
       const contentDisposition = response.headers.get("content-disposition");
       const fileName = contentDisposition
         ? contentDisposition.split("filename=")[1].replace(/"/g, "")
@@ -330,16 +328,24 @@ export function MortiseForm() {
               </DialogDescription>
             </DialogHeader>
             {previewUrl && (
-              <div className="h-[400px] w-full">
-                <StlViewer
-                  url={previewUrl}
-                  modelColor="#3b82f6"
-                  backgroundColor="#f8fafc"
-                  rotate={true}
-                  orbitControls={true}
-                  shadows={true}
-                  style={{ width: "100%", height: "100%" }}
-                />
+              <div className="h-[400px] w-full relative">
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center"
+                     style={{ display: mutation.isPending ? 'flex' : 'none' }}>
+                  <div className="text-center">
+                    <Ruler className="h-8 w-8 animate-spin mx-auto mb-2" />
+                    <p>Generating template...</p>
+                  </div>
+                </div>
+                <div className="h-full w-full" style={{ display: mutation.isPending ? 'none' : 'block' }}>
+                  <STLViewer
+                    url={previewUrl}
+                    width={600}
+                    height={400}
+                    modelColor="#3b82f6"
+                    backgroundColor="#f8fafc"
+                    orbitControls={true}
+                  />
+                </div>
               </div>
             )}
             <Button type="button" onClick={handleDownload} className="mt-4">

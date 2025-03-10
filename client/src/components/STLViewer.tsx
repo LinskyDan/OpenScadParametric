@@ -21,174 +21,178 @@ function STLViewer({
   orbitControls = true
 }: STLViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
-  const modelRef = useRef<THREE.Mesh | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Scene setup
-    const scene = new THREE.Scene();
-    sceneRef.current = scene;
-    scene.background = new THREE.Color(backgroundColor);
+    let isUnmounted = false;
+    let animationFrameId: number | null = null;
+    let renderer: THREE.WebGLRenderer | null = null;
+    let scene: THREE.Scene | null = null;
+    let camera: THREE.PerspectiveCamera | null = null;
+    let controls: OrbitControls | null = null;
+    let mesh: THREE.Mesh | null = null;
 
-    // Camera setup
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    cameraRef.current = camera;
-    camera.position.z = 5;
+    try {
+      // Scene setup
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(backgroundColor);
 
-    // Renderer setup with preserveDrawingBuffer for context loss
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: true,
-      powerPreference: 'high-performance',
-      preserveDrawingBuffer: true,
-      alpha: true
-    });
-    rendererRef.current = renderer;
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(window.devicePixelRatio);
+      // Camera setup
+      camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+      camera.position.z = 5;
 
-    // Handle context loss
-    const canvas = renderer.domElement;
-    canvas.addEventListener('webglcontextlost', (event) => {
-      event.preventDefault();
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-    }, false);
-
-    canvas.addEventListener('webglcontextrestored', () => {
-      if (renderer && scene && camera) {
-        renderer.setSize(width, height);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        startAnimation();
-      }
-    }, false);
-
-    containerRef.current.appendChild(canvas);
-
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 1);
-    scene.add(ambientLight);
-
-    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight1.position.set(1, 1, 1);
-    scene.add(directionalLight1);
-
-    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight2.position.set(-1, -1, -1);
-    scene.add(directionalLight2);
-
-    // OrbitControls
-    if (orbitControls) {
-      const controls = new OrbitControls(camera, renderer.domElement);
-      controlsRef.current = controls;
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.25;
-      controls.screenSpacePanning = false;
-      controls.maxPolarAngle = Math.PI;
-      controls.update();
-    }
-
-    // Animation loop
-    const startAnimation = () => {
-      const animate = () => {
-        if (controlsRef.current) controlsRef.current.update();
-        if (rendererRef.current && sceneRef.current && cameraRef.current) {
-          rendererRef.current.render(sceneRef.current, cameraRef.current);
-        }
-        animationFrameRef.current = requestAnimationFrame(animate);
-      };
-      animate();
-    };
-
-    // Load STL
-    fetch(url)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.arrayBuffer();
-      })
-      .then(buffer => {
-        if (containerRef.current) {
-          try {
-            const loader = new CustomSTLLoader();
-            const geometry = loader.parse(buffer);
-
-            // Center geometry
-            geometry.computeBoundingBox();
-            const box = geometry.boundingBox;
-            if (box) {
-              const center = new THREE.Vector3();
-              box.getCenter(center);
-              geometry.translate(-center.x, -center.y, -center.z);
-
-              // Normalize size
-              const maxDim = Math.max(
-                box.max.x - box.min.x,
-                box.max.y - box.min.y,
-                box.max.z - box.min.z
-              );
-              const scale = 2 / maxDim;
-              geometry.scale(scale, scale, scale);
-            }
-
-            // Create material and mesh
-            const material = new THREE.MeshPhongMaterial({
-              color: modelColor,
-              specular: 0x111111,
-              shininess: 200
-            });
-            const mesh = new THREE.Mesh(geometry, material);
-
-            // Remove any existing model
-            if (modelRef.current && sceneRef.current) {
-              sceneRef.current.remove(modelRef.current);
-              modelRef.current.geometry.dispose();
-              modelRef.current.material.dispose();
-            }
-
-            scene.add(mesh);
-            modelRef.current = mesh;
-            setLoading(false);
-
-            startAnimation();
-          } catch (error) {
-            console.error('Error parsing STL:', error);
-          }
-        }
-      })
-      .catch(error => {
-        console.error('Error loading STL:', error);
+      // Renderer setup
+      renderer = new THREE.WebGLRenderer({ 
+        antialias: true,
+        powerPreference: 'high-performance',
+        alpha: true
       });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(window.devicePixelRatio);
 
-    // Cleanup
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+      // Handle context loss
+      const handleContextLost = (event: Event) => {
+        event.preventDefault();
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
+        setError('WebGL context lost. Please refresh the page.');
+      };
+
+      const handleContextRestored = () => {
+        if (renderer && scene && camera) {
+          renderer.setSize(width, height);
+          renderer.setPixelRatio(window.devicePixelRatio);
+          setError(null);
+          animate();
+        }
+      };
+
+      renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
+      renderer.domElement.addEventListener('webglcontextrestored', handleContextRestored);
+      containerRef.current.appendChild(renderer.domElement);
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0x404040, 1);
+      scene.add(ambientLight);
+
+      const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight1.position.set(1, 1, 1);
+      scene.add(directionalLight1);
+
+      const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight2.position.set(-1, -1, -1);
+      scene.add(directionalLight2);
+
+      // OrbitControls
+      if (orbitControls) {
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.25;
+        controls.screenSpacePanning = false;
+        controls.maxPolarAngle = Math.PI;
+        controls.update();
       }
 
-      if (containerRef.current && canvas.parentNode === containerRef.current) {
-        containerRef.current.removeChild(canvas);
-      }
+      // Animation loop
+      const animate = () => {
+        if (isUnmounted) return;
+        if (controls) controls.update();
+        if (renderer && scene && camera) {
+          renderer.render(scene, camera);
+        }
+        animationFrameId = requestAnimationFrame(animate);
+      };
 
-      if (modelRef.current && sceneRef.current) {
-        sceneRef.current.remove(modelRef.current);
-        modelRef.current.geometry.dispose();
-        modelRef.current.material.dispose();
-      }
+      // Load STL
+      const loadSTL = async () => {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          const buffer = await response.arrayBuffer();
 
-      if (rendererRef.current) {
-        rendererRef.current.dispose();
-      }
-    };
+          if (isUnmounted) return;
+
+          const loader = new CustomSTLLoader();
+          const geometry = loader.parse(buffer);
+
+          // Center geometry
+          geometry.computeBoundingBox();
+          const box = geometry.boundingBox;
+          if (box) {
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+            geometry.translate(-center.x, -center.y, -center.z);
+
+            // Normalize size
+            const maxDim = Math.max(
+              box.max.x - box.min.x,
+              box.max.y - box.min.y,
+              box.max.z - box.min.z
+            );
+            const scale = 2 / maxDim;
+            geometry.scale(scale, scale, scale);
+          }
+
+          // Create material and mesh
+          const material = new THREE.MeshPhongMaterial({
+            color: modelColor,
+            specular: 0x111111,
+            shininess: 200
+          });
+
+          if (mesh && scene) {
+            scene.remove(mesh);
+            mesh.geometry.dispose();
+            mesh.material.dispose();
+          }
+
+          mesh = new THREE.Mesh(geometry, material);
+          scene?.add(mesh);
+          setLoading(false);
+          animate();
+        } catch (err) {
+          console.error('Error loading STL:', err);
+          setError((err as Error).message);
+          setLoading(false);
+        }
+      };
+
+      loadSTL();
+
+      return () => {
+        isUnmounted = true;
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+
+        if (containerRef.current && renderer?.domElement) {
+          renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
+          renderer.domElement.removeEventListener('webglcontextrestored', handleContextRestored);
+          containerRef.current.removeChild(renderer.domElement);
+        }
+
+        if (mesh && scene) {
+          scene.remove(mesh);
+          mesh.geometry.dispose();
+          mesh.material.dispose();
+        }
+
+        if (renderer) {
+          renderer.dispose();
+        }
+      };
+    } catch (err) {
+      console.error('Error initializing viewer:', err);
+      setError((err as Error).message);
+      setLoading(false);
+    }
   }, [url, width, height, backgroundColor, modelColor, orbitControls]);
 
   return (
@@ -202,6 +206,34 @@ function STLViewer({
           color: '#333'
         }}>
           Loading model...
+        </div>
+      )}
+      {error && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          color: '#ef4444',
+          textAlign: 'center',
+          padding: '1rem'
+        }}>
+          Error: {error}
+          <br />
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              marginTop: '0.5rem',
+              padding: '0.25rem 0.5rem',
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              borderRadius: '0.25rem',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            Refresh Page
+          </button>
         </div>
       )}
     </div>
