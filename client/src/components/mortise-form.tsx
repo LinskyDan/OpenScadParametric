@@ -94,42 +94,42 @@ export function MortiseForm() {
       return;
     }
 
-    console.log('Initializing 3D scene');
+    // Ensure container has dimensions
+    const containerWidth = containerRef.current.clientWidth || 600;
+    const containerHeight = containerRef.current.clientHeight || 400;
+
+    if (containerWidth === 0 || containerHeight === 0) {
+      console.error('Container has zero dimensions:', { containerWidth, containerHeight });
+      return;
+    }
+
+    console.log('Initializing 3D scene with dimensions:', { containerWidth, containerHeight });
     cleanup();
 
     try {
-      const width = containerRef.current.clientWidth;
-      const height = containerRef.current.clientHeight;
-      console.log('Container dimensions:', { width, height });
-
-      // Scene setup
       const scene = new THREE.Scene();
       scene.background = new THREE.Color('#f8fafc');
       sceneRef.current = scene;
 
-      // Camera setup
-      const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+      const camera = new THREE.PerspectiveCamera(75, containerWidth / containerHeight, 0.1, 1000);
       camera.position.set(0, 0, 5);
       cameraRef.current = camera;
 
-      // Renderer setup
       const renderer = new THREE.WebGLRenderer({
         antialias: true,
         alpha: true,
       });
-      renderer.setSize(width, height);
+      renderer.setSize(containerWidth, containerHeight);
       renderer.setPixelRatio(window.devicePixelRatio);
       rendererRef.current = renderer;
       containerRef.current.appendChild(renderer.domElement);
 
-      // Controls setup
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.dampingFactor = 0.05;
       controls.enableZoom = true;
       controlsRef.current = controls;
 
-      // Lighting setup
       const ambientLight = new THREE.AmbientLight(0x404040, 1);
       scene.add(ambientLight);
 
@@ -143,7 +143,6 @@ export function MortiseForm() {
 
       console.log('Scene initialized successfully');
 
-      // Animation loop
       const animate = () => {
         frameRef.current = requestAnimationFrame(animate);
         controls.update();
@@ -247,12 +246,18 @@ export function MortiseForm() {
   };
 
   useEffect(() => {
+    // Add a small delay to ensure container is mounted and sized
     if (showPreview && previewUrl) {
-      console.log('Initializing 3D viewer with URL:', previewUrl);
-      initScene();
-      loadSTL(previewUrl);
+      const timer = setTimeout(() => {
+        console.log('Initializing preview after delay');
+        initScene();
+        loadSTL(previewUrl);
+      }, 100);
+      return () => {
+        clearTimeout(timer);
+        cleanup();
+      };
     }
-    return cleanup;
   }, [previewUrl, showPreview]);
 
   const mutation = useMutation({
@@ -261,9 +266,9 @@ export function MortiseForm() {
         setStlError(null);
         const response = await fetch("/api/generate", {
           method: "POST",
-          headers: { 
+          headers: {
             "Content-Type": "application/json",
-            "Accept": "application/stl" 
+            "Accept": "application/stl"
           },
           body: JSON.stringify(data),
         });
@@ -543,7 +548,7 @@ export function MortiseForm() {
                 Preview your mortise template. Click and drag to rotate, scroll to zoom.
               </DialogDescription>
             </DialogHeader>
-            <div className="h-[400px] w-full relative bg-slate-50 rounded-lg overflow-hidden">
+            <div className="h-[400px] w-[600px] relative bg-slate-50 rounded-lg overflow-hidden">
               {mutation.isPending && (
                 <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
                   <div className="text-center">
@@ -552,20 +557,16 @@ export function MortiseForm() {
                   </div>
                 </div>
               )}
-              <div ref={containerRef} className="h-full w-full" />
+              <div
+                ref={containerRef}
+                className="h-full w-full"
+                style={{ minHeight: '400px', minWidth: '600px' }}
+              />
               {stlError && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="bg-red-50 p-4 rounded-md text-red-700">
                     <p className="font-semibold">Error loading model:</p>
                     <p>{stlError}</p>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="mt-2"
-                      onClick={() => setStlError(null)}
-                    >
-                      Dismiss
-                    </Button>
                   </div>
                 </div>
               )}
