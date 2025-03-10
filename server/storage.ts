@@ -49,6 +49,7 @@ export class DatabaseStorage implements IStorage {
     const cutout_length = mortise_length + (offset * 2);
     const cutout_width = mortise_width + (offset * 2);
 
+    // Base template dimensions
     const total_length = mortise_length + (extension_length * 2);
     const total_width = mortise_width + edge_thickness + extension_width;
 
@@ -72,33 +73,13 @@ mortise_length = ${mortise_length};
 mortise_width = ${mortise_width};
 offset = ${offset};
 
-// Cutout dimensions
-cutout_x = ${cutout_x};
-cutout_y = ${cutout_y};
-cutout_length = ${cutout_length};
-cutout_width = ${cutout_width};
-
-// Rounded rectangle module
-module rounded_rect(length, width, height, radius) {
-    hull() {
-        translate([radius, radius, 0])
-            cylinder(h=height, r=radius);
-        translate([length - radius, radius, 0])
-            cylinder(h=height, r=radius);
-        translate([radius, width - radius, 0])
-            cylinder(h=height, r=radius);
-        translate([length - radius, width - radius, 0])
-            cylinder(h=height, r=radius);
-    }
-}
-
 // Guide hole module
 module guide_hole(x, y) {
     translate([x, y, -0.1])
         cylinder(h=thickness + 0.2, r=${bushing_OD/2});
 }
 
-// Main template module
+// Main template
 difference() {
     union() {
         // Base plate
@@ -113,20 +94,10 @@ difference() {
     guide_hole(cutout_x, cutout_y + mortise_width);
     guide_hole(cutout_x + mortise_length, cutout_y + mortise_width);
 
-    // Text engravings
-    translate([cutout_x + mortise_length + 10, edge_thickness + 5, thickness - 0.5]) {
+    // Text engravings - simplified for debugging
+    translate([cutout_x + mortise_length + 5, edge_thickness + 5, thickness - 0.5]) {
         linear_extrude(height = 1.0) {
-            text(str("Mortise Template"), size = 4, halign = "left");
-            translate([0, -7, 0])
-                text(str("Length: ", "${params.mortise_length_in}\""), size = 3, halign = "left");
-            translate([0, -12, 0])
-                text(str("Width: ", "${params.mortise_width_in}\""), size = 3, halign = "left");
-            translate([0, -17, 0])
-                text(str("Edge Dist: ", "${params.edge_distance_in}\""), size = 3, halign = "left");
-            translate([0, -22, 0])
-                text(str("Bit: ", "${params.bit_diameter_in}\""), size = 3, halign = "left");
-            translate([0, -27, 0])
-                text(str("Bushing: ", "${params.bushing_OD_in}\""), size = 3, halign = "left");
+            text("Mortise Template", size = 4, halign = "left");
         }
     }
 }
