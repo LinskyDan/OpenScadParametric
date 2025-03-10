@@ -18,65 +18,15 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  private decimalToFraction(decimal: number): string {
-    // Handle common fractions for woodworking (1/2, 1/4, 1/8, 1/16)
-    const commonFractions = [
-      { denominator: 2, tolerance: 0.0078125 },   // 1/2 (0.5)
-      { denominator: 4, tolerance: 0.00390625 },  // 1/4 (0.25)
-      { denominator: 8, tolerance: 0.001953125 }, // 1/8 (0.125)
-      { denominator: 16, tolerance: 0.0009765625 }// 1/16 (0.0625)
-    ];
-
-    const wholePart = Math.floor(decimal);
-    const fractionalPart = decimal - wholePart;
-
-    // Special handling for 1/16 (0.03125)
-    if (Math.abs(fractionalPart - 0.03125) < 0.001) {
-      return "1/16";
-    }
-
-    // Check for zero fractional part
-    if (Math.abs(fractionalPart) < 0.001) {
-      return wholePart.toString();
-    }
-
-    // Try to match with common fractions
-    for (const { denominator, tolerance } of commonFractions) {
-      const nearestNumerator = Math.round(fractionalPart * denominator);
-      const difference = Math.abs(fractionalPart - nearestNumerator / denominator);
-
-      if (difference < tolerance) {
-        // Simplify the fraction if possible
-        let num = nearestNumerator;
-        let den = denominator;
-
-        // Find the GCD
-        const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
-        const divisor = gcd(num, den);
-
-        num = num / divisor;
-        den = den / divisor;
-
-        // Return appropriate format based on whole part
-        if (wholePart === 0) {
-          return `${num}/${den}`;
-        }
-        return `${wholePart}-${num}/${den}`;
-      }
-    }
-
-    // If no match found, return decimal format with 3 decimal places
-    return decimal.toFixed(3);
-  }
-
-  private formatMeasurement(value: number, unitSystem: string): string {
-    if (unitSystem === "metric") {
-      return value.toFixed(1);
-    }
-    return this.decimalToFraction(value) + '\\"';  // Escape the inch symbol for OpenSCAD
+  private async ensureTempDir() {
+    const tempDir = path.join(process.cwd(), 'temp');
+    await fs.mkdir(tempDir, { recursive: true, mode: 0o755 });
+    return tempDir;
   }
 
   private async generateOpenSCADContent(params: MortiseTemplate): Promise<string> {
+    console.log('Generating SCAD file with params:', params);
+
     // Convert all measurements to millimeters for OpenSCAD
     const scale = 25.4; // inches to mm
 
@@ -91,32 +41,29 @@ export class DatabaseStorage implements IStorage {
     const edge_height = 12.7; // 0.5 inches in mm
     const edge_thickness = 9.525; // 0.375 inches in mm
 
-    // Calculate offset in inches directly
     const offset_in = (params.bushing_OD_in - params.bit_diameter_in) / 2;
-    const offset = offset_in * scale; // Convert to mm for OpenSCAD
+    const offset = offset_in * scale;
     const cutout_length = mortise_length + (offset * 2);
     const cutout_width = mortise_width + (offset * 2);
 
-    // Base template dimensions
     const total_length = cutout_length + (extension_length * 2);
     const total_width = cutout_width + edge_thickness + extension_width;
 
-    // Position calculations
     const cutout_x = (total_length - cutout_length) / 2;
     const cutout_y = edge_thickness + (edge_distance - offset);
 
-    // Pre-format all measurements for text
-    const formatted = {
-      bushing_OD: this.formatMeasurement(params.bushing_OD_in, params.unit_system),
-      bit_diameter: this.formatMeasurement(params.bit_diameter_in, params.unit_system),
-      mortise_length: this.formatMeasurement(params.mortise_length_in, params.unit_system),
-      mortise_width: this.formatMeasurement(params.mortise_width_in, params.unit_system),
-      edge_distance: this.formatMeasurement(params.edge_distance_in, params.unit_system),
-      offset: params.unit_system === "imperial" ? this.decimalToFraction(offset_in) + '\\"' : offset_in.toFixed(2)
-    };
+    // Generate test cube to verify OpenSCAD functionality
+    const testCube = `
+// Test cube
+translate([-20, -20, 0])
+  cube([10, 10, 10]);
+`;
 
-    return `
-// Dimensions in mm
+    const scadContent = `
+// Set render quality
+$fn = 100;
+
+// Base dimensions in mm
 total_length = ${total_length};
 total_width = ${total_width};
 thickness = ${template_thickness};
@@ -128,99 +75,108 @@ cutout_x = ${cutout_x};
 cutout_y = ${cutout_y};
 corner_radius = ${bushing_OD / 2};
 
-// Rounded rectangle module
+// Rounded rectangle module with high resolution
 module rounded_rect(length, width, height, radius) {
     hull() {
         translate([radius, radius, 0])
-            cylinder(h=height, r=radius, $fn=50);
+            cylinder(h=height, r=radius);
         translate([length - radius, radius, 0])
-            cylinder(h=height, r=radius, $fn=50);
+            cylinder(h=height, r=radius);
         translate([radius, width - radius, 0])
-            cylinder(h=height, r=radius, $fn=50);
+            cylinder(h=height, r=radius);
         translate([length - radius, width - radius, 0])
-            cylinder(h=height, r=radius, $fn=50);
+            cylinder(h=height, r=radius);
     }
 }
 
 // Main template
-difference() {
-    union() {
-        // Base plate
-        cube([total_length, total_width, thickness]);
-        // Edge stop
-        cube([total_length, edge_thickness, thickness + edge_height]);
-    }
+union() {
+    difference() {
+        union() {
+            // Base plate
+            cube([total_length, total_width, thickness]);
+            // Edge stop
+            cube([total_length, edge_thickness, thickness + edge_height]);
+        }
 
-    // Mortise cutout
-    translate([cutout_x, cutout_y, -0.1])
-        rounded_rect(cutout_length, cutout_width, thickness + 0.2, corner_radius);
+        // Mortise cutout with rounded corners
+        translate([cutout_x, cutout_y, -0.1])
+            rounded_rect(cutout_length, cutout_width, thickness + 0.2, corner_radius);
 
-    // Text engravings - positioned to the right of cutout with more spacing
-    translate([cutout_x + cutout_length + 20, total_width/2, thickness - 0.5]) {
-        linear_extrude(height = 1.0) {
-            // Each text line positioned with proper spacing
-            text(str("Bushing OD: ", "${formatted.bushing_OD}"), 
-                size = 3, halign = "left");
-            translate([0, -5, 0])
-                text(str("Bit Dia: ", "${formatted.bit_diameter}"), 
-                    size = 3, halign = "left");
-            translate([0, -10, 0])
-                text(str("Length: ", "${formatted.mortise_length}"), 
-                    size = 3, halign = "left");
-            translate([0, -15, 0])
-                text(str("Width: ", "${formatted.mortise_width}"), 
-                    size = 3, halign = "left");
-            translate([0, -20, 0])
-                text(str("Edge Dist: ", "${formatted.edge_distance}"), 
-                    size = 3, halign = "left");
-            translate([0, -25, 0])
-                text(str("Offset: ", "${formatted.offset}"), 
-                    size = 3, halign = "left");
+        // Engraved text (measurements)
+        translate([cutout_x + cutout_length + 10, edge_thickness + 5, thickness - 0.5]) {
+            linear_extrude(height = 1.0) {
+                text(str("Mortise Template"), size = 4, halign = "left");
+                translate([0, -7, 0])
+                    text(str("Length: ${params.mortise_length_in}\\""), size = 3, halign = "left");
+                translate([0, -12, 0])
+                    text(str("Width: ${params.mortise_width_in}\\""), size = 3, halign = "left");
+                translate([0, -17, 0])
+                    text(str("Edge Dist: ${params.edge_distance_in}\\""), size = 3, halign = "left");
+                translate([0, -22, 0])
+                    text(str("Bit: ${params.bit_diameter_in}\\""), size = 3, halign = "left");
+                translate([0, -27, 0])
+                    text(str("Bushing: ${params.bushing_OD_in}\\""), size = 3, halign = "left");
+            }
         }
     }
+    ${testCube}
 }
 `;
+
+    console.log('Generated OpenSCAD content:', scadContent);
+    return scadContent;
   }
 
   async generateSTLFile(params: MortiseTemplate): Promise<{ filePath: string; content: Buffer }> {
     try {
-      const tempDir = path.join(process.cwd(), 'temp');
-      await fs.mkdir(tempDir, { recursive: true });
+      // Ensure temp directory exists with proper permissions
+      const tempDir = await this.ensureTempDir();
+      console.log('Using temp directory:', tempDir);
 
       const timestamp = Date.now();
       const scadFile = path.join(tempDir, `mortise_${timestamp}.scad`);
       const stlFile = path.join(tempDir, `mortise_${timestamp}.stl`);
 
-      console.log('Generating SCAD file with params:', JSON.stringify(params, null, 2));
+      console.log('Writing OpenSCAD file:', scadFile);
       const scadContent = await this.generateOpenSCADContent(params);
+      await fs.writeFile(scadFile, scadContent, { mode: 0o644 });
 
-      // Log the generated OpenSCAD content for debugging
-      console.log('Generated OpenSCAD content:', scadContent);
+      try {
+        // Run OpenSCAD with verbose output
+        const openscadCmd = `openscad -o "${stlFile}" "${scadFile}" --debug all`;
+        console.log('Executing OpenSCAD command:', openscadCmd);
 
-      await fs.writeFile(scadFile, scadContent);
+        const { stdout, stderr } = await execAsync(openscadCmd);
+        console.log('OpenSCAD stdout:', stdout);
+        if (stderr) console.error('OpenSCAD stderr:', stderr);
 
-      const { stdout, stderr } = await execAsync(`openscad -o "${stlFile}" "${scadFile}"`);
-      console.log('OpenSCAD output:', stdout);
-      if (stderr) console.error('OpenSCAD stderr:', stderr);
+        // Verify STL file exists and read its content
+        const stlContent = await fs.readFile(stlFile);
+        console.log('STL file details:', {
+          path: stlFile,
+          size: stlContent.length,
+          exists: await fs.access(stlFile).then(() => true).catch(() => false)
+        });
 
-      // Verify that the STL file was created and has content
-      const stlContent = await fs.readFile(stlFile);
-      if (stlContent.length === 0) {
-        throw new Error('Generated STL file is empty');
+        if (stlContent.length === 0) {
+          throw new Error('Generated STL file is empty');
+        }
+
+        // Clean up temporary files
+        await fs.unlink(scadFile).catch(console.error);
+
+        return {
+          filePath: stlFile,
+          content: stlContent
+        };
+      } catch (error) {
+        console.error('Error during STL generation:', error);
+        throw error;
       }
-
-      console.log(`Generated STL file size: ${stlContent.length} bytes`);
-
-      // Clean up SCAD file
-      await fs.unlink(scadFile);
-
-      return {
-        filePath: stlFile,
-        content: stlContent
-      };
     } catch (error) {
-      console.error('Error generating STL:', error);
-      throw new Error('Failed to generate STL file');
+      console.error('Error in generateSTLFile:', error);
+      throw new Error(`Failed to generate STL file: ${error}`);
     }
   }
 
