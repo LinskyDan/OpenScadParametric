@@ -37,17 +37,19 @@ class CustomSTLLoader extends THREE.Loader {
 
   private isBinary(buffer: ArrayBuffer): boolean {
     const HEADER_SIZE = 84;
-    if (buffer.byteLength < HEADER_SIZE) return false;
+    if (buffer.byteLength < HEADER_SIZE) {
+      throw new Error('STL file too small to be valid');
+    }
 
     const dataView = new DataView(buffer);
-    const faceSize = (32 / 8 * 3) + ((32 / 8 * 3) * 3) + (16 / 8);
     const nFaces = dataView.getUint32(80, true);
-    const expectedSize = HEADER_SIZE + (faceSize * nFaces);
+    const expectedSize = HEADER_SIZE + (50 * nFaces); // 50 = 4*12 + 2 (normal, vertices, attribute)
 
-    if (buffer.byteLength !== expectedSize) return false;
+    if (buffer.byteLength < expectedSize) {
+      throw new Error('STL file is truncated');
+    }
 
-    // Verify that the size is reasonable
-    return nFaces > 0 && nFaces < 50000000;
+    return true; // Assume binary if size matches
   }
 
   private parseBinary(dataView: DataView): THREE.BufferGeometry {
@@ -55,36 +57,39 @@ class CustomSTLLoader extends THREE.Loader {
     const vertices: number[] = [];
     const normals: number[] = [];
 
-    const nFaces = dataView.getUint32(80, true);
-    const dataOffset = 84;
-    const faceLength = 12 * 4 + 2;
-
     try {
+      // Skip header
+      const headerOffset = 80;
+      const nFaces = dataView.getUint32(headerOffset, true);
+      let offset = headerOffset + 4;
+
+      // Validate total size
+      const expectedSize = offset + (nFaces * 50);
+      if (dataView.byteLength < expectedSize) {
+        throw new Error('Invalid STL: File size does not match number of faces');
+      }
+
+      // Read each face
       for (let face = 0; face < nFaces; face++) {
-        const start = dataOffset + face * faceLength;
-
-        // Ensure we have enough data for this face
-        if (start + faceLength > dataView.byteLength) {
-          throw new Error('STL file is truncated or corrupt');
-        }
-
         // Normal
-        const nx = dataView.getFloat32(start, true);
-        const ny = dataView.getFloat32(start + 4, true);
-        const nz = dataView.getFloat32(start + 8, true);
+        const nx = dataView.getFloat32(offset, true);
+        const ny = dataView.getFloat32(offset + 4, true);
+        const nz = dataView.getFloat32(offset + 8, true);
+        offset += 12;
 
-        // Vertices
+        // Three vertices per face
         for (let i = 0; i < 3; i++) {
-          const vertexStart = start + 12 + (i * 12);
-
           vertices.push(
-            dataView.getFloat32(vertexStart, true),
-            dataView.getFloat32(vertexStart + 4, true),
-            dataView.getFloat32(vertexStart + 8, true)
+            dataView.getFloat32(offset, true),
+            dataView.getFloat32(offset + 4, true),
+            dataView.getFloat32(offset + 8, true)
           );
-
           normals.push(nx, ny, nz);
+          offset += 12;
         }
+
+        // Skip attribute byte count
+        offset += 2;
       }
 
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
@@ -92,7 +97,7 @@ class CustomSTLLoader extends THREE.Loader {
 
       return geometry;
     } catch (error) {
-      throw new Error(`Error parsing binary STL: ${error}`);
+      throw new Error(`Failed to parse binary STL: ${error}`);
     }
   }
 
@@ -132,7 +137,7 @@ class CustomSTLLoader extends THREE.Loader {
 
       return geometry;
     } catch (error) {
-      throw new Error(`Error parsing ASCII STL: ${error}`);
+      throw new Error(`Failed to parse ASCII STL: ${error}`);
     }
   }
 }
