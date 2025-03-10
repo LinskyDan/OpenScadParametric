@@ -44,7 +44,25 @@ export function MortiseForm() {
   const frameRef = useRef<number>(0);
   const meshRef = useRef<THREE.Mesh | null>(null);
 
+  // Initialize form first to avoid circular dependency
+  const form = useForm<MortiseTemplate>({
+    resolver: zodResolver(formSchema),
+    defaultValues,
+  });
+
+  const unitSystem = form.watch("unit_system");
+
+  const getStepSize = () => unitSystem === "imperial" ? 0.0625 : 0.1;
+  const formatValue = (value: number) => unitSystem === "imperial" ? value : inchToMm(value);
+  const parseValue = (value: string) => {
+    const num = parseFloat(value);
+    return unitSystem === "imperial" ? num : mmToInch(num);
+  };
+
+  const getUnitLabel = () => unitSystem === "imperial" ? "inches" : "mm";
+
   const cleanup = () => {
+    console.log('Cleaning up 3D viewer resources');
     if (frameRef.current) {
       cancelAnimationFrame(frameRef.current);
     }
@@ -71,21 +89,27 @@ export function MortiseForm() {
   };
 
   const initScene = () => {
-    if (!containerRef.current) return;
+    if (!containerRef.current) {
+      console.error('Container ref is not available');
+      return;
+    }
 
+    console.log('Initializing 3D scene');
     cleanup();
 
     try {
+      const width = containerRef.current.clientWidth;
+      const height = containerRef.current.clientHeight;
+      console.log('Container dimensions:', { width, height });
+
       // Scene setup
       const scene = new THREE.Scene();
       scene.background = new THREE.Color('#f8fafc');
       sceneRef.current = scene;
 
       // Camera setup
-      const width = containerRef.current.clientWidth;
-      const height = containerRef.current.clientHeight;
       const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-      camera.position.z = 5;
+      camera.position.set(0, 0, 5);
       cameraRef.current = camera;
 
       // Renderer setup
@@ -117,6 +141,8 @@ export function MortiseForm() {
       backLight.position.set(-1, -1, -1);
       scene.add(backLight);
 
+      console.log('Scene initialized successfully');
+
       // Animation loop
       const animate = () => {
         frameRef.current = requestAnimationFrame(animate);
@@ -132,13 +158,34 @@ export function MortiseForm() {
   };
 
   const loadSTL = async (url: string) => {
-    if (!sceneRef.current || !cameraRef.current) return;
+    if (!sceneRef.current || !cameraRef.current) {
+      console.error('Scene or camera not initialized');
+      return;
+    }
 
     try {
       setStlError(null);
+      console.log('Loading STL from URL:', url);
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to load STL: ${response.statusText}`);
+      }
+
+      const buffer = await response.arrayBuffer();
+      console.log('Received STL buffer size:', buffer.byteLength);
+
+      if (buffer.byteLength === 0) {
+        throw new Error('Received empty STL data');
+      }
 
       const loader = new STLLoader();
-      const geometry = await loader.loadAsync(url);
+      const geometry = loader.parse(buffer);
+
+      console.log('STL parsed successfully:', {
+        vertices: geometry.attributes.position?.count || 0,
+        faces: geometry.attributes.position?.count / 3 || 0
+      });
 
       if (!geometry.attributes.position) {
         throw new Error('Invalid STL: No vertex data found');
@@ -170,10 +217,15 @@ export function MortiseForm() {
         specular: 0x111111,
       });
 
+      // Clean up existing mesh if any
       if (meshRef.current) {
         sceneRef.current.remove(meshRef.current);
-        meshRef.current.geometry.dispose();
-        meshRef.current.material.dispose();
+        if (meshRef.current.geometry) {
+          meshRef.current.geometry.dispose();
+        }
+        if (meshRef.current.material instanceof THREE.Material) {
+          meshRef.current.material.dispose();
+        }
       }
 
       const mesh = new THREE.Mesh(geometry, material);
@@ -186,6 +238,8 @@ export function MortiseForm() {
         controlsRef.current.reset();
       }
 
+      console.log('STL loaded and mesh added to scene');
+
     } catch (err) {
       console.error('Error loading STL:', err);
       setStlError((err as Error).message);
@@ -194,27 +248,12 @@ export function MortiseForm() {
 
   useEffect(() => {
     if (showPreview && previewUrl) {
+      console.log('Initializing 3D viewer with URL:', previewUrl);
       initScene();
       loadSTL(previewUrl);
     }
     return cleanup;
   }, [previewUrl, showPreview]);
-
-  const form = useForm<MortiseTemplate>({
-    resolver: zodResolver(formSchema),
-    defaultValues,
-  });
-
-  const unitSystem = form.watch("unit_system");
-
-  const getStepSize = () => unitSystem === "imperial" ? 0.0625 : 0.1;
-  const formatValue = (value: number) => unitSystem === "imperial" ? value : inchToMm(value);
-  const parseValue = (value: string) => {
-    const num = parseFloat(value);
-    return unitSystem === "imperial" ? num : mmToInch(num);
-  };
-
-  const getUnitLabel = () => unitSystem === "imperial" ? "inches" : "mm";
 
   const mutation = useMutation({
     mutationFn: async (data: MortiseTemplate) => {
@@ -249,6 +288,7 @@ export function MortiseForm() {
       }
     },
     onSuccess: (url) => {
+      console.log('STL generated successfully, preview URL:', url);
       setPreviewUrl(url);
       setShowPreview(true);
       toast({
