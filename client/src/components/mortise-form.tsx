@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useState } from "react";
-import { StlViewer as STLViewer } from "react-stl-viewer";
+import STLViewer from "./STLViewer";
 
 const defaultValues: MortiseTemplate = {
   unit_system: "imperial",
@@ -33,6 +33,7 @@ export function MortiseForm() {
   const { toast } = useToast();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [stlError, setStlError] = useState<string | null>(null);
 
   const form = useForm<MortiseTemplate>({
     resolver: zodResolver(formSchema),
@@ -52,24 +53,33 @@ export function MortiseForm() {
 
   const mutation = useMutation({
     mutationFn: async (data: MortiseTemplate) => {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      try {
+        setStlError(null);
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
 
-      if (!response.ok) {
-        throw new Error("Failed to generate STL file");
+        if (!response.ok) {
+          throw new Error(`Failed to generate STL file: ${response.statusText}`);
+        }
+
+        const contentDisposition = response.headers.get("content-disposition");
+        const fileName = contentDisposition
+          ? contentDisposition.split("filename=")[1].replace(/"/g, "")
+          : "mortise_template.stl";
+
+        const blob = await response.blob();
+        if (blob.size === 0) {
+          throw new Error("Generated STL file is empty");
+        }
+
+        return { url: URL.createObjectURL(blob), fileName };
+      } catch (error) {
+        setStlError((error as Error).message);
+        throw error;
       }
-
-      const contentDisposition = response.headers.get("content-disposition");
-      const fileName = contentDisposition
-        ? contentDisposition.split("filename=")[1].replace(/"/g, "")
-        : "mortise_template.stl";
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      return { url, fileName };
     },
     onSuccess: (data) => {
       setPreviewUrl(data.url);
@@ -89,6 +99,9 @@ export function MortiseForm() {
   });
 
   const onSubmit = (data: MortiseTemplate) => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
     mutation.mutate(data);
   };
 
@@ -327,16 +340,17 @@ export function MortiseForm() {
                 Preview your mortise template. Click and drag to rotate.
               </DialogDescription>
             </DialogHeader>
-            {previewUrl && (
-              <div className="h-[400px] w-full relative">
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center"
-                     style={{ display: mutation.isPending ? 'flex' : 'none' }}>
+            <div className="h-[400px] w-full relative">
+              {mutation.isPending && (
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
                   <div className="text-center">
                     <Ruler className="h-8 w-8 animate-spin mx-auto mb-2" />
                     <p>Generating template...</p>
                   </div>
                 </div>
-                <div className="h-full w-full" style={{ display: mutation.isPending ? 'none' : 'block' }}>
+              )}
+              {previewUrl && !mutation.isPending && (
+                <div className="h-full w-full">
                   <STLViewer
                     url={previewUrl}
                     width={600}
@@ -346,9 +360,30 @@ export function MortiseForm() {
                     orbitControls={true}
                   />
                 </div>
-              </div>
-            )}
-            <Button type="button" onClick={handleDownload} className="mt-4">
+              )}
+              {stlError && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-red-50 p-4 rounded-md text-red-700">
+                    <p className="font-semibold">Error loading model:</p>
+                    <p>{stlError}</p>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => setStlError(null)}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <Button
+              type="button"
+              onClick={handleDownload}
+              className="mt-4"
+              disabled={!previewUrl || mutation.isPending}
+            >
               <Download className="mr-2 h-4 w-4" />
               Download STL
             </Button>

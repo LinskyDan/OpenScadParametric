@@ -35,6 +35,28 @@ function STLViewer({
     let controls: OrbitControls | null = null;
     let mesh: THREE.Mesh | null = null;
 
+    const cleanup = () => {
+      isUnmounted = true;
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+
+      if (containerRef.current && renderer?.domElement) {
+        containerRef.current.removeChild(renderer.domElement);
+      }
+
+      if (mesh) {
+        mesh.geometry.dispose();
+        if (mesh.material instanceof THREE.Material) {
+          mesh.material.dispose();
+        }
+      }
+
+      if (renderer) {
+        renderer.dispose();
+      }
+    };
+
     try {
       // Scene setup
       scene = new THREE.Scene();
@@ -47,33 +69,10 @@ function STLViewer({
       // Renderer setup
       renderer = new THREE.WebGLRenderer({ 
         antialias: true,
-        powerPreference: 'high-performance',
         alpha: true
       });
       renderer.setSize(width, height);
       renderer.setPixelRatio(window.devicePixelRatio);
-
-      // Handle context loss
-      const handleContextLost = (event: Event) => {
-        event.preventDefault();
-        if (animationFrameId) {
-          cancelAnimationFrame(animationFrameId);
-          animationFrameId = null;
-        }
-        setError('WebGL context lost. Please refresh the page.');
-      };
-
-      const handleContextRestored = () => {
-        if (renderer && scene && camera) {
-          renderer.setSize(width, height);
-          renderer.setPixelRatio(window.devicePixelRatio);
-          setError(null);
-          animate();
-        }
-      };
-
-      renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
-      renderer.domElement.addEventListener('webglcontextrestored', handleContextRestored);
       containerRef.current.appendChild(renderer.domElement);
 
       // Lighting
@@ -113,16 +112,23 @@ function STLViewer({
         try {
           const response = await fetch(url);
           if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
+            throw new Error(`Failed to load STL file: ${response.statusText}`);
           }
           const buffer = await response.arrayBuffer();
+          if (buffer.byteLength === 0) {
+            throw new Error('STL file is empty');
+          }
 
           if (isUnmounted) return;
 
           const loader = new CustomSTLLoader();
           const geometry = loader.parse(buffer);
 
-          // Center geometry
+          if (!geometry.attributes.position) {
+            throw new Error('Invalid STL file: No vertex data found');
+          }
+
+          // Center and scale geometry
           geometry.computeBoundingBox();
           const box = geometry.boundingBox;
           if (box) {
@@ -130,7 +136,6 @@ function STLViewer({
             box.getCenter(center);
             geometry.translate(-center.x, -center.y, -center.z);
 
-            // Normalize size
             const maxDim = Math.max(
               box.max.x - box.min.x,
               box.max.y - box.min.y,
@@ -147,12 +152,6 @@ function STLViewer({
             shininess: 200
           });
 
-          if (mesh && scene) {
-            scene.remove(mesh);
-            mesh.geometry.dispose();
-            mesh.material.dispose();
-          }
-
           mesh = new THREE.Mesh(geometry, material);
           scene?.add(mesh);
           setLoading(false);
@@ -166,32 +165,12 @@ function STLViewer({
 
       loadSTL();
 
-      return () => {
-        isUnmounted = true;
-        if (animationFrameId) {
-          cancelAnimationFrame(animationFrameId);
-        }
-
-        if (containerRef.current && renderer?.domElement) {
-          renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
-          renderer.domElement.removeEventListener('webglcontextrestored', handleContextRestored);
-          containerRef.current.removeChild(renderer.domElement);
-        }
-
-        if (mesh && scene) {
-          scene.remove(mesh);
-          mesh.geometry.dispose();
-          mesh.material.dispose();
-        }
-
-        if (renderer) {
-          renderer.dispose();
-        }
-      };
+      return cleanup;
     } catch (err) {
       console.error('Error initializing viewer:', err);
       setError((err as Error).message);
       setLoading(false);
+      return cleanup;
     }
   }, [url, width, height, backgroundColor, modelColor, orbitControls]);
 
@@ -219,21 +198,6 @@ function STLViewer({
           padding: '1rem'
         }}>
           Error: {error}
-          <br />
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              marginTop: '0.5rem',
-              padding: '0.25rem 0.5rem',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              borderRadius: '0.25rem',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            Refresh Page
-          </button>
         </div>
       )}
     </div>
