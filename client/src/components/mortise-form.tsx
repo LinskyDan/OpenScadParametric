@@ -1,3 +1,4 @@
+
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
@@ -62,114 +63,77 @@ export function MortiseForm() {
         throw new Error("Failed to generate STL file");
       }
 
-      const result = await response.json();
-      return result.previewUrl;
+      // Get the file name from Content-Disposition header
+      const contentDisposition = response.headers.get("content-disposition");
+      const fileName = contentDisposition
+        ? contentDisposition.split("filename=")[1].replace(/"/g, "")
+        : "mortise_template.stl";
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      return { url, fileName };
     },
-    onSuccess: (previewUrl) => {
-      setPreviewUrl(previewUrl);
+    onSuccess: (data) => {
+      setPreviewUrl(data.url);
       setShowPreview(true);
       toast({
-        title: "Success!",
-        description: "STL file has been generated. You can preview it now.",
+        title: "Success",
+        description: "STL file generated successfully",
       });
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: "Error",
-        description: "Failed to generate STL file.",
+        description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  const downloadFile = async () => {
-    if (!previewUrl) return;
-
-    const downloadUrl = previewUrl.replace('preview', 'download');
-    const response = await fetch(downloadUrl);
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "mortise_template.stl";
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-    setShowPreview(false);
-  };
-
   const onSubmit = (data: MortiseTemplate) => {
     mutation.mutate(data);
   };
 
+  const handleDownload = () => {
+    if (!previewUrl) return;
+
+    const a = document.createElement("a");
+    a.href = previewUrl;
+    a.download = "mortise_template.stl";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   return (
-    <>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField
-              control={form.control}
-              name="unit_system"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Measurement System</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select measurement system" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="imperial">Imperial (inches)</SelectItem>
-                      <SelectItem value="metric">Metric (mm)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>Choose your preferred measurement system</FormDescription>
-                </FormItem>
-              )}
-            />
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <FormField
+          control={form.control}
+          name="unit_system"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Unit System</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select unit system" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="imperial">Imperial (inches)</SelectItem>
+                  <SelectItem value="metric">Metric (mm)</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormDescription>Choose your preferred unit system</FormDescription>
+            </FormItem>
+          )}
+        />
 
-            <FormField
-              control={form.control}
-              name="bushing_OD_in"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Bushing Outside Diameter</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step={getStepSize()}
-                      {...field}
-                      value={formatValue(field.value)}
-                      onChange={e => field.onChange(parseValue(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormDescription>Outside diameter of the guide bushing ({getUnitLabel()})</FormDescription>
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="bit_diameter_in"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Router Bit Diameter</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step={getStepSize()}
-                      {...field}
-                      value={formatValue(field.value)}
-                      onChange={e => field.onChange(parseValue(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormDescription>Outside diameter of the router bit ({getUnitLabel()})</FormDescription>
-                </FormItem>
-              )}
-            />
-
+        {/* Category 1: Define Your Mortise Size */}
+        <div className="space-y-4 border rounded-lg p-4">
+          <h3 className="text-lg font-semibold">1. Define Your Mortise Size</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
               name="mortise_length_in"
@@ -209,6 +173,80 @@ export function MortiseForm() {
                 </FormItem>
               )}
             />
+          </div>
+        </div>
+
+        {/* Category 2: Set Your Bit and Bushing Diameter */}
+        <div className="space-y-4 border rounded-lg p-4">
+          <h3 className="text-lg font-semibold">2. Set Your Bit and Bushing Diameter</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="bit_diameter_in"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Router Bit Diameter</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step={getStepSize()}
+                      {...field}
+                      value={formatValue(field.value)}
+                      onChange={e => field.onChange(parseValue(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormDescription>Outside diameter of router bit ({getUnitLabel()})</FormDescription>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="bushing_OD_in"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Guide Bushing Diameter</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step={getStepSize()}
+                      {...field}
+                      value={formatValue(field.value)}
+                      onChange={e => field.onChange(parseValue(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormDescription>Outside diameter of guide bushing ({getUnitLabel()})</FormDescription>
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
+        {/* Category 3: Customize Your Template */}
+        <div className="space-y-4 border rounded-lg p-4">
+          <h3 className="text-lg font-semibold">3. Customize Your Template</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="edge_position"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Edge Position</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select edge position" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="left">Left</SelectItem>
+                      <SelectItem value="right">Right</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>The edge the template will be aligned to</FormDescription>
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
@@ -225,7 +263,7 @@ export function MortiseForm() {
                       onChange={e => field.onChange(parseValue(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>Distance from the edge ({getUnitLabel()})</FormDescription>
+                  <FormDescription>Distance from edge to mortise ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
@@ -235,7 +273,7 @@ export function MortiseForm() {
               name="extension_length_in"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Extension Length</FormLabel>
+                  <FormLabel>Template Length</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -245,7 +283,7 @@ export function MortiseForm() {
                       onChange={e => field.onChange(parseValue(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>Extra length beyond the cutout ({getUnitLabel()})</FormDescription>
+                  <FormDescription>Total template length ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
@@ -255,7 +293,7 @@ export function MortiseForm() {
               name="extension_width_in"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Extension Width</FormLabel>
+                  <FormLabel>Template Width</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -265,10 +303,11 @@ export function MortiseForm() {
                       onChange={e => field.onChange(parseValue(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>Extra width beyond the cutout ({getUnitLabel()})</FormDescription>
+                  <FormDescription>Total template width ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
               name="template_thickness_in"
@@ -284,59 +323,53 @@ export function MortiseForm() {
                       onChange={e => field.onChange(parseValue(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>Thickness of the template ({getUnitLabel()})</FormDescription>
+                  <FormDescription>Thickness of template ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
           </div>
+        </div>
 
-          <Button type="submit" className="w-full" disabled={mutation.isPending}>
-            {mutation.isPending ? (
-              "Generating..."
-            ) : (
-              <>
-                <Ruler className="mr-2 h-4 w-4" />
-                Generate Preview
-              </>
-            )}
+        <div className="flex flex-col space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
+          <Button type="submit" className="flex-1" disabled={mutation.isPending}>
+            {mutation.isPending ? "Generating..." : "Generate Template"}
           </Button>
-        </form>
-      </Form>
+          {previewUrl && (
+            <Button type="button" onClick={handleDownload} variant="outline" className="flex-1">
+              <Download className="mr-2 h-4 w-4" />
+              Download STL
+            </Button>
+          )}
+        </div>
 
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-            <DialogContent className="max-w-4xl">
-              <DialogHeader>
-                <DialogTitle>Preview Mortise Template</DialogTitle>
-                <DialogDescription>
-                  View and interact with your generated mortise template. Use mouse to rotate and zoom the 3D model.
-                </DialogDescription>
-              </DialogHeader>
-              {previewUrl ? (
-                <div className="aspect-square w-full bg-black/5 rounded-lg overflow-hidden" aria-label="3D preview of mortise template">
-                  <StlViewer
-                    url={previewUrl}
-                    style={{ width: '100%', height: '100%' }}
-                    orbitControls
-                    shadows
-                    modelProps={{
-                      scale: 1,
-                      rotationX: 0,
-                      rotationY: 0,
-                      rotationZ: 0
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center justify-center aspect-square w-full bg-black/5 rounded-lg">
-                  <p className="text-muted-foreground">Loading preview...</p>
-                </div>
-              )}
-              <Button onClick={downloadFile} className="mt-4">
-                <Download className="mr-2 h-4 w-4" />
-                Download STL File
-              </Button>
-            </DialogContent>
-          </Dialog>
-    </>
+        <Dialog open={showPreview} onOpenChange={setShowPreview}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>3D Preview</DialogTitle>
+              <DialogDescription>
+                Preview your mortise template. Click and drag to rotate.
+              </DialogDescription>
+            </DialogHeader>
+            {previewUrl && (
+              <div className="h-[400px] w-full">
+                <StlViewer
+                  url={previewUrl}
+                  modelColor="#3b82f6"
+                  backgroundColor="#f8fafc"
+                  rotate={true}
+                  orbitControls={true}
+                  shadows={true}
+                  style={{ width: "100%", height: "100%" }}
+                />
+              </div>
+            )}
+            <Button type="button" onClick={handleDownload} className="mt-4">
+              <Download className="mr-2 h-4 w-4" />
+              Download STL
+            </Button>
+          </DialogContent>
+        </Dialog>
+      </form>
+    </Form>
   );
 }
