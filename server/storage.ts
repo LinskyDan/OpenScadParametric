@@ -103,6 +103,7 @@ export class DatabaseStorage implements IStorage {
 
     // Position calculations
     const cutout_x = (total_length - cutout_length) / 2;
+    // Always position relative to left edge since we fixed edge_position to "left"
     const cutout_y = edge_thickness + (edge_distance - offset);
 
     // Pre-format all measurements for text

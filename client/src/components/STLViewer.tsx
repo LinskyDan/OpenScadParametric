@@ -175,8 +175,8 @@ function STLViewer({
         cancelAnimationFrame(animationFrameRef.current);
       }
 
-      if (containerRef.current && canvas.parentNode === containerRef.current) {
-        containerRef.current.removeChild(canvas);
+      if (containerRef.current && rendererRef.current && rendererRef.current.domElement.parentNode === containerRef.current) {
+        containerRef.current.removeChild(rendererRef.current.domElement);
       }
 
       if (modelRef.current && sceneRef.current) {
