@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useState } from "react";
-import StlViewer from "@/components/STLViewer";
+import { StlViewer } from "react-stl-viewer";
 
 const defaultValues: MortiseTemplate = {
   unit_system: "imperial",
@@ -62,11 +62,8 @@ export function MortiseForm() {
         throw new Error("Failed to generate STL file");
       }
 
-      // Get the file name from Content-Disposition header
-      const contentDisposition = response.headers.get("content-disposition");
-      const fileName = contentDisposition
-        ? contentDisposition.split("filename=")[1].replace(/"/g, "")
-        : "mortise_template.stl";
+      const responseData = await response.json();
+      return { url: responseData.previewUrl, fileName: "mortise_template.stl" };
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
@@ -96,8 +93,11 @@ export function MortiseForm() {
   const handleDownload = () => {
     if (!previewUrl) return;
 
+    // Convert preview URL to download URL
+    const downloadUrl = previewUrl.replace("/api/preview/", "/api/download/");
+    
     const a = document.createElement("a");
-    a.href = previewUrl;
+    a.href = downloadUrl;
     a.download = "mortise_template.stl";
     document.body.appendChild(a);
     a.click();
@@ -353,12 +353,13 @@ export function MortiseForm() {
               <div className="h-[400px] w-full">
                 <StlViewer
                   url={previewUrl}
-                  modelcolor="#3b82f6"
-                  backgroundcolor="#f8fafc"
+                  width={800}
+                  height={400}
+                  modelColor="#3b82f6"
+                  backgroundColor="#f8fafc"
                   rotate={true}
-                  orbitcontrols={true}
+                  orbitControls={true}
                   shadows={true}
-                  style={{ width: "100%", height: "100%" }}
                 />
               </div>
             )}

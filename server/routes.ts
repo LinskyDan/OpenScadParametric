@@ -25,6 +25,10 @@ export function registerRoutes(app: Express): Server {
       if (!exists) {
         return res.status(404).json({ error: "File not found" });
       }
+      
+      // Set proper content type for STL files
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="${req.params.filename}"`);
       res.sendFile(filePath);
     } catch (error) {
       console.error('Error:', error);
