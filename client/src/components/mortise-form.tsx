@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useState } from "react";
-import { StlViewer } from "react-stl-viewer";
+import StlViewer from "@/components/STLViewer";
 
 const defaultValues: MortiseTemplate = {
   unit_system: "imperial",
@@ -351,13 +351,13 @@ export function MortiseForm() {
             </DialogHeader>
             {previewUrl && (
               <div className="h-[400px] w-full">
-                <STLViewer
+                <StlViewer
                   url={previewUrl}
                   modelcolor="#3b82f6"
                   backgroundcolor="#f8fafc"
-                  rotate="true"
-                  orbitcontrols="true"
-                  shadows="true"
+                  rotate={true}
+                  orbitcontrols={true}
+                  shadows={true}
                   style={{ width: "100%", height: "100%" }}
                 />
               </div>
