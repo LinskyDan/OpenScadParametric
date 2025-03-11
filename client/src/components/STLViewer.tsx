@@ -65,7 +65,7 @@ export default function STLViewer({
       0.1, 
       1000
     );
-    camera.position.z = 5;
+    camera.position.z = 3; // Closer position for better zooming
     cameraRef.current = camera;
     
     // Setup renderer with error handling
@@ -193,7 +193,7 @@ export default function STLViewer({
               geometry.boundingBox.max.y - geometry.boundingBox.min.y,
               geometry.boundingBox.max.z - geometry.boundingBox.min.z
             );
-            const scale = 4 / maxDim;
+            const scale = 6 / maxDim; // Increased scale factor for better visibility
             geometry.scale(scale, scale, scale);
           }
           
