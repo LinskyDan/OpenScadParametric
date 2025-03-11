@@ -353,11 +353,11 @@ export function MortiseForm() {
               <div className="h-[400px] w-full">
                 <StlViewer
                   url={previewUrl}
-                  modelColor="#3b82f6"
-                  backgroundColor="#f8fafc"
-                  rotate={true}
-                  orbitControls={true}
-                  shadows={true}
+                  modelcolor="#3b82f6"
+                  backgroundcolor="#f8fafc"
+                  rotate="true"
+                  orbitcontrols="true"
+                  shadows="true"
                   style={{ width: "100%", height: "100%" }}
                 />
               </div>

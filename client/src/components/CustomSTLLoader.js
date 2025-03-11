@@ -47,13 +47,20 @@ class CustomSTLLoader extends THREE.Loader {
     }
 
     function parseBinary(data) {
-      const reader = new DataView(data);
-      const faces = reader.getUint32(80, true);
+      try {
+        const reader = new DataView(data);
+        const faces = reader.getUint32(80, true);
 
-      let r, g, b;
-      const defaultR = 0.5;
-      const defaultG = 0.5;
-      const defaultB = 0.5;
+        // Basic validation to prevent DataView bounds errors
+        if (faces < 0 || faces > 5000000) { // Set a reasonable max face count
+          console.error("Invalid number of faces in STL file:", faces);
+          return new THREE.BufferGeometry(); // Return empty geometry
+        }
+
+        let r, g, b;
+        const defaultR = 0.5;
+        const defaultG = 0.5;
+        const defaultB = 0.5;
 
       const geometry = new THREE.BufferGeometry();
       const positions = [];
@@ -64,10 +71,18 @@ class CustomSTLLoader extends THREE.Loader {
       const faceLength = 12 * 4 + 2;
 
       for (let face = 0; face < faces; face++) {
-        const start = dataOffset + face * faceLength;
-        const normalX = reader.getFloat32(start, true);
-        const normalY = reader.getFloat32(start + 4, true);
-        const normalZ = reader.getFloat32(start + 8, true);
+        try {
+          const start = dataOffset + face * faceLength;
+          
+          // Check if we're still within bounds
+          if (start + 48 > reader.byteLength) {
+            console.error("STL file data is truncated");
+            break;
+          }
+          
+          const normalX = reader.getFloat32(start, true);
+          const normalY = reader.getFloat32(start + 4, true);
+          const normalZ = reader.getFloat32(start + 8, true);
 
         // Flat face normals
         for (let i = 1; i <= 3; i++) {
@@ -96,6 +111,9 @@ class CustomSTLLoader extends THREE.Loader {
           const z = reader.getFloat32(vertexStart + 8, true);
           positions.push(x, y, z);
           colors.push(r, g, b);
+        } catch (e) {
+          console.error("Error parsing STL face:", e);
+          break;
         }
       }
 
@@ -107,7 +125,11 @@ class CustomSTLLoader extends THREE.Loader {
       }
 
       return geometry;
+    } catch (e) {
+      console.error("Fatal error parsing binary STL:", e);
+      return new THREE.BufferGeometry(); // Return empty geometry on error
     }
+  }
 
     function parseASCII(data) {
       const text = decoder.decode(data);
