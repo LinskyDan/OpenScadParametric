@@ -351,7 +351,7 @@ export function MortiseForm() {
             </DialogHeader>
             {previewUrl && (
               <div className="h-[400px] w-full">
-                <StlViewer
+                <STLViewer
                   url={previewUrl}
                   modelcolor="#3b82f6"
                   backgroundcolor="#f8fafc"
