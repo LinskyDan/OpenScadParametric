@@ -262,7 +262,7 @@ export function MortiseForm() {
                       onChange={e => field.onChange(parseValue(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>Distance from edge to mortise ({getUnitLabel()})</FormDescription>
+                  <FormDescription>Distance from workpiece edge to mortise ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
