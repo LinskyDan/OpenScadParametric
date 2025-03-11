@@ -1,4 +1,3 @@
-
 import * as THREE from 'three';
 
 class CustomSTLLoader extends THREE.Loader {
@@ -13,7 +12,7 @@ class CustomSTLLoader extends THREE.Loader {
     loader.setResponseType('arraybuffer');
     loader.setRequestHeader(this.requestHeader);
     loader.setWithCredentials(this.withCredentials);
-    
+
     loader.load(url, function(buffer) {
       try {
         onLoad(scope.parse(buffer));
@@ -30,7 +29,7 @@ class CustomSTLLoader extends THREE.Loader {
 
   parse(buffer) {
     const decoder = new TextDecoder();
-    
+
     function isBinary(data) {
       const reader = new DataView(data);
       const faceSize = (32 / 8 * 3) + ((32 / 8 * 3) * 3) + (16 / 8);
