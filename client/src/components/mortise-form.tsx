@@ -10,10 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { useState, useEffect, useRef } from "react";
-import * as THREE from 'three';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { useState } from "react";
+import { StlViewer } from "react-stl-viewer";
 
 const defaultValues: MortiseTemplate = {
   unit_system: "imperial",
@@ -22,10 +20,10 @@ const defaultValues: MortiseTemplate = {
   mortise_length_in: 1.75,
   mortise_width_in: 0.375,
   edge_distance_in: 0.25,
-  edge_position: "left",
+  edge_position: "right",
   extension_length_in: 3.0,
   extension_width_in: 3.0,
-  template_thickness_in: 0.25,
+  template_thickness_in: 0.25, // Default template thickness (1/4 inch)
 };
 
 const mmToInch = (mm: number) => mm / 25.4;
@@ -35,16 +33,7 @@ export function MortiseForm() {
   const { toast } = useToast();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [stlError, setStlError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
-  const frameRef = useRef<number>(0);
-  const meshRef = useRef<THREE.Mesh | null>(null);
 
-  // Initialize form first to avoid circular dependency
   const form = useForm<MortiseTemplate>({
     resolver: zodResolver(formSchema),
     defaultValues,
@@ -61,300 +50,126 @@ export function MortiseForm() {
 
   const getUnitLabel = () => unitSystem === "imperial" ? "inches" : "mm";
 
-  const cleanup = () => {
-    console.log('Cleaning up 3D viewer resources');
-    if (frameRef.current) {
-      cancelAnimationFrame(frameRef.current);
-    }
-    if (meshRef.current) {
-      if (meshRef.current.geometry) {
-        meshRef.current.geometry.dispose();
-      }
-      if (meshRef.current.material instanceof THREE.Material) {
-        meshRef.current.material.dispose();
-      }
-    }
-    if (rendererRef.current) {
-      rendererRef.current.dispose();
-    }
-    if (sceneRef.current) {
-      sceneRef.current.clear();
-    }
-    if (controlsRef.current) {
-      controlsRef.current.dispose();
-    }
-    if (containerRef.current && rendererRef.current?.domElement) {
-      containerRef.current.removeChild(rendererRef.current.domElement);
-    }
-  };
-
-  const initScene = () => {
-    if (!containerRef.current) {
-      console.error('Container ref is not available');
-      return;
-    }
-
-    // Ensure container has dimensions
-    const containerWidth = containerRef.current.clientWidth || 600;
-    const containerHeight = containerRef.current.clientHeight || 400;
-
-    if (containerWidth === 0 || containerHeight === 0) {
-      console.error('Container has zero dimensions:', { containerWidth, containerHeight });
-      return;
-    }
-
-    console.log('Initializing 3D scene with dimensions:', { containerWidth, containerHeight });
-    cleanup();
-
-    try {
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color('#f8fafc');
-      sceneRef.current = scene;
-
-      const camera = new THREE.PerspectiveCamera(75, containerWidth / containerHeight, 0.1, 1000);
-      camera.position.set(0, 0, 5);
-      cameraRef.current = camera;
-
-      const renderer = new THREE.WebGLRenderer({
-        antialias: true,
-        alpha: true,
-      });
-      renderer.setSize(containerWidth, containerHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
-      rendererRef.current = renderer;
-      containerRef.current.appendChild(renderer.domElement);
-
-      const controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-      controls.enableZoom = true;
-      controlsRef.current = controls;
-
-      const ambientLight = new THREE.AmbientLight(0x404040, 1);
-      scene.add(ambientLight);
-
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-      directionalLight.position.set(1, 1, 1);
-      scene.add(directionalLight);
-
-      const backLight = new THREE.DirectionalLight(0xffffff, 0.5);
-      backLight.position.set(-1, -1, -1);
-      scene.add(backLight);
-
-      console.log('Scene initialized successfully');
-
-      const animate = () => {
-        frameRef.current = requestAnimationFrame(animate);
-        controls.update();
-        renderer.render(scene, camera);
-      };
-      animate();
-
-    } catch (error) {
-      console.error('Error initializing Three.js scene:', error);
-      setStlError('Failed to initialize 3D viewer');
-    }
-  };
-
-  const loadSTL = async (url: string) => {
-    if (!sceneRef.current || !cameraRef.current) {
-      console.error('Scene or camera not initialized');
-      return;
-    }
-
-    try {
-      setStlError(null);
-      console.log('Loading STL from URL:', url);
-
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to load STL: ${response.statusText}`);
-      }
-
-      const buffer = await response.arrayBuffer();
-      console.log('Received STL buffer size:', buffer.byteLength);
-
-      if (buffer.byteLength === 0) {
-        throw new Error('Received empty STL data');
-      }
-
-      const loader = new STLLoader();
-      const geometry = loader.parse(buffer);
-
-      console.log('STL parsed successfully:', {
-        vertices: geometry.attributes.position?.count || 0,
-        faces: geometry.attributes.position?.count / 3 || 0
-      });
-
-      if (!geometry.attributes.position) {
-        throw new Error('Invalid STL: No vertex data found');
-      }
-
-      // Center and scale the geometry
-      geometry.computeBoundingBox();
-      const box = geometry.boundingBox;
-      if (!box) {
-        throw new Error('Failed to compute model boundaries');
-      }
-
-      const center = new THREE.Vector3();
-      box.getCenter(center);
-      geometry.translate(-center.x, -center.y, -center.z);
-
-      const maxDim = Math.max(
-        box.max.x - box.min.x,
-        box.max.y - box.min.y,
-        box.max.z - box.min.z
-      );
-      const scale = 3 / maxDim;
-      geometry.scale(scale, scale, scale);
-
-      // Create mesh with phong material for better lighting
-      const material = new THREE.MeshPhongMaterial({
-        color: 0x3b82f6,
-        shininess: 30,
-        specular: 0x111111,
-      });
-
-      // Clean up existing mesh if any
-      if (meshRef.current) {
-        sceneRef.current.remove(meshRef.current);
-        if (meshRef.current.geometry) {
-          meshRef.current.geometry.dispose();
-        }
-        if (meshRef.current.material instanceof THREE.Material) {
-          meshRef.current.material.dispose();
-        }
-      }
-
-      const mesh = new THREE.Mesh(geometry, material);
-      meshRef.current = mesh;
-      sceneRef.current.add(mesh);
-
-      // Reset camera position
-      cameraRef.current.position.set(0, 0, 5);
-      if (controlsRef.current) {
-        controlsRef.current.reset();
-      }
-
-      console.log('STL loaded and mesh added to scene');
-
-    } catch (err) {
-      console.error('Error loading STL:', err);
-      setStlError((err as Error).message);
-    }
-  };
-
-  useEffect(() => {
-    // Add a small delay to ensure container is mounted and sized
-    if (showPreview && previewUrl) {
-      const timer = setTimeout(() => {
-        console.log('Initializing preview after delay');
-        initScene();
-        loadSTL(previewUrl);
-      }, 100);
-      return () => {
-        clearTimeout(timer);
-        cleanup();
-      };
-    }
-  }, [previewUrl, showPreview]);
-
   const mutation = useMutation({
     mutationFn: async (data: MortiseTemplate) => {
-      try {
-        setStlError(null);
-        const response = await fetch("/api/generate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/stl"
-          },
-          body: JSON.stringify(data),
-        });
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
 
-        if (!response.ok) {
-          throw new Error(`Failed to generate STL file: ${response.statusText}`);
-        }
-
-        const blob = await response.blob();
-        console.log('Response blob size:', blob.size, 'bytes');
-        console.log('Response type:', blob.type);
-
-        if (blob.size === 0) {
-          throw new Error("Generated STL file is empty");
-        }
-
-        return URL.createObjectURL(blob);
-      } catch (error) {
-        console.error('STL generation error:', error);
-        setStlError((error as Error).message);
-        throw error;
+      if (!response.ok) {
+        throw new Error("Failed to generate STL file");
       }
+
+      const result = await response.json();
+      return result.previewUrl;
     },
-    onSuccess: (url) => {
-      console.log('STL generated successfully, preview URL:', url);
-      setPreviewUrl(url);
+    onSuccess: (previewUrl) => {
+      setPreviewUrl(previewUrl);
       setShowPreview(true);
       toast({
-        title: "Success",
-        description: "STL file generated successfully",
+        title: "Success!",
+        description: "STL file has been generated. You can preview it now.",
       });
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "Error",
-        description: error.message,
+        description: "Failed to generate STL file.",
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: MortiseTemplate) => {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-    mutation.mutate(data);
-  };
-
-  const handleDownload = () => {
+  const downloadFile = async () => {
     if (!previewUrl) return;
+
+    const downloadUrl = previewUrl.replace('preview', 'download');
+    const response = await fetch(downloadUrl);
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = previewUrl;
+    a.href = url;
     a.download = "mortise_template.stl";
     document.body.appendChild(a);
     a.click();
+    window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+    setShowPreview(false);
+  };
+
+  const onSubmit = (data: MortiseTemplate) => {
+    mutation.mutate(data);
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <FormField
-          control={form.control}
-          name="unit_system"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Unit System</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select unit system" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="imperial">Imperial (inches)</SelectItem>
-                  <SelectItem value="metric">Metric (mm)</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormDescription>Choose your preferred unit system</FormDescription>
-            </FormItem>
-          )}
-        />
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormField
+              control={form.control}
+              name="unit_system"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Measurement System</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select measurement system" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="imperial">Imperial (inches)</SelectItem>
+                      <SelectItem value="metric">Metric (mm)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Choose your preferred measurement system</FormDescription>
+                </FormItem>
+              )}
+            />
 
-        <div className="space-y-4 border rounded-lg p-4">
-          <h3 className="text-lg font-semibold">1. Define Your Mortise Size</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="bushing_OD_in"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Bushing Outside Diameter</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step={getStepSize()}
+                      {...field}
+                      value={formatValue(field.value)}
+                      onChange={e => field.onChange(parseValue(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormDescription>Outside diameter of the guide bushing ({getUnitLabel()})</FormDescription>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="bit_diameter_in"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Router Bit Diameter</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step={getStepSize()}
+                      {...field}
+                      value={formatValue(field.value)}
+                      onChange={e => field.onChange(parseValue(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormDescription>Outside diameter of the router bit ({getUnitLabel()})</FormDescription>
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="mortise_length_in"
@@ -394,57 +209,6 @@ export function MortiseForm() {
                 </FormItem>
               )}
             />
-          </div>
-        </div>
-
-        <div className="space-y-4 border rounded-lg p-4">
-          <h3 className="text-lg font-semibold">2. Set Your Bit and Bushing Diameter</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="bit_diameter_in"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Router Bit Diameter</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step={getStepSize()}
-                      {...field}
-                      value={formatValue(field.value)}
-                      onChange={e => field.onChange(parseValue(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormDescription>Outside diameter of router bit ({getUnitLabel()})</FormDescription>
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="bushing_OD_in"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Guide Bushing Diameter</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step={getStepSize()}
-                      {...field}
-                      value={formatValue(field.value)}
-                      onChange={e => field.onChange(parseValue(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormDescription>Outside diameter of guide bushing ({getUnitLabel()})</FormDescription>
-                </FormItem>
-              )}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4 border rounded-lg p-4">
-          <h3 className="text-lg font-semibold">3. Customize Your Template</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
             <FormField
               control={form.control}
@@ -461,7 +225,7 @@ export function MortiseForm() {
                       onChange={e => field.onChange(parseValue(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>Distance from edge to mortise ({getUnitLabel()})</FormDescription>
+                  <FormDescription>Distance from the edge ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
@@ -471,7 +235,7 @@ export function MortiseForm() {
               name="extension_length_in"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Template Length</FormLabel>
+                  <FormLabel>Extension Length</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -481,7 +245,7 @@ export function MortiseForm() {
                       onChange={e => field.onChange(parseValue(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>Total template length ({getUnitLabel()})</FormDescription>
+                  <FormDescription>Extra length beyond the cutout ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
@@ -491,7 +255,7 @@ export function MortiseForm() {
               name="extension_width_in"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Template Width</FormLabel>
+                  <FormLabel>Extension Width</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -501,11 +265,10 @@ export function MortiseForm() {
                       onChange={e => field.onChange(parseValue(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>Total template width ({getUnitLabel()})</FormDescription>
+                  <FormDescription>Extra width beyond the cutout ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
-
             <FormField
               control={form.control}
               name="template_thickness_in"
@@ -521,68 +284,59 @@ export function MortiseForm() {
                       onChange={e => field.onChange(parseValue(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>Thickness of template ({getUnitLabel()})</FormDescription>
+                  <FormDescription>Thickness of the template ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
           </div>
-        </div>
 
-        <div className="flex flex-col space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
-          <Button type="submit" className="flex-1" disabled={mutation.isPending}>
-            {mutation.isPending ? "Generating..." : "Generate Template"}
+          <Button type="submit" className="w-full" disabled={mutation.isPending}>
+            {mutation.isPending ? (
+              "Generating..."
+            ) : (
+              <>
+                <Ruler className="mr-2 h-4 w-4" />
+                Generate Preview
+              </>
+            )}
           </Button>
-          {previewUrl && (
-            <Button type="button" onClick={handleDownload} variant="outline" className="flex-1">
-              <Download className="mr-2 h-4 w-4" />
-              Download STL
-            </Button>
-          )}
-        </div>
+        </form>
+      </Form>
 
-        <Dialog open={showPreview} onOpenChange={setShowPreview}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>3D Preview</DialogTitle>
-              <DialogDescription>
-                Preview your mortise template. Click and drag to rotate, scroll to zoom.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="h-[400px] w-[600px] relative bg-slate-50 rounded-lg overflow-hidden">
-              {mutation.isPending && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
-                  <div className="text-center">
-                    <Ruler className="h-8 w-8 animate-spin mx-auto mb-2" />
-                    <p>Generating template...</p>
-                  </div>
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Preview Mortise Template</DialogTitle>
+                <DialogDescription>
+                  View and interact with your generated mortise template. Use mouse to rotate and zoom the 3D model.
+                </DialogDescription>
+              </DialogHeader>
+              {previewUrl ? (
+                <div className="aspect-square w-full bg-black/5 rounded-lg overflow-hidden" aria-label="3D preview of mortise template">
+                  <StlViewer
+                    url={previewUrl}
+                    style={{ width: '100%', height: '100%' }}
+                    orbitControls
+                    shadows
+                    modelProps={{
+                      scale: 1,
+                      rotationX: 0,
+                      rotationY: 0,
+                      rotationZ: 0
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center aspect-square w-full bg-black/5 rounded-lg">
+                  <p className="text-muted-foreground">Loading preview...</p>
                 </div>
               )}
-              <div
-                ref={containerRef}
-                className="h-full w-full"
-                style={{ minHeight: '400px', minWidth: '600px' }}
-              />
-              {stlError && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-red-50 p-4 rounded-md text-red-700">
-                    <p className="font-semibold">Error loading model:</p>
-                    <p>{stlError}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-            <Button
-              type="button"
-              onClick={handleDownload}
-              className="mt-4"
-              disabled={!previewUrl || mutation.isPending}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download STL
-            </Button>
-          </DialogContent>
-        </Dialog>
-      </form>
-    </Form>
+              <Button onClick={downloadFile} className="mt-4">
+                <Download className="mr-2 h-4 w-4" />
+                Download STL File
+              </Button>
+            </DialogContent>
+          </Dialog>
+    </>
   );
 }

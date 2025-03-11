@@ -10,7 +10,7 @@ export const mortiseTemplateSchema = z.object({
   mortise_length_in: z.number().min(0.1).max(250),
   mortise_width_in: z.number().min(0.1).max(250),
   edge_distance_in: z.number().min(0.1).max(125),
-  edge_position: z.enum(["left", "right"]).default("left"),
+  edge_position: z.enum(["left", "right"]),
   extension_length_in: z.number().min(0.1).max(250),
   extension_width_in: z.number().min(0.1).max(250),
   template_thickness_in: z.number().min(0.1).max(2),
