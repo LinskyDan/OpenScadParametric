@@ -282,7 +282,7 @@ export function MortiseForm() {
                       onChange={e => field.onChange(parseValue(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>Total template length ({getUnitLabel()})</FormDescription>
+                  <FormDescription>Extra length beyond the cutout ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
@@ -302,7 +302,7 @@ export function MortiseForm() {
                       onChange={e => field.onChange(parseValue(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>Total template width ({getUnitLabel()})</FormDescription>
+                  <FormDescription>Extra width beyond the cutout ({getUnitLabel()})</FormDescription>
                 </FormItem>
               )}
             />
